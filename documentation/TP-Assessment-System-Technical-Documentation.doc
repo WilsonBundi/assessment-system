@@ -1,0 +1,1007 @@
+<!DOCTYPE html>
+<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
+<head>
+<meta charset="utf-8">
+<title>TP Assessment System Technical Documentation</title>
+<!--[if gte mso 9]><xml>
+ <w:WordDocument>
+  <w:View>Print</w:View>
+  <w:Zoom>100</w:Zoom>
+ </w:WordDocument>
+</xml><![endif]-->
+<style>
+body { font-family: Arial, sans-serif; color: #333; }
+h1 { color: #2E75B6; }
+h2 { color: #5B9BD5; }
+h3 { color: #70AD47; }
+pre { font-family: Consolas, monospace; }
+table { width: 100%; border-collapse: collapse; margin: 15px 0; }
+th, td { border: 1px solid #999; padding: 5px; }
+</style>
+</head>
+<body>
+<h1>TP Assessment System Technical Documentation</h1>
+<p><h1 style="color: #2E75B6;">TP Assessment System - Technical Overview</h1>
+
+<strong>Project Type:</strong> Yii 2 Framework PHP Web Application
+<strong>Database:</strong> PostgreSQL (tp_assessment)
+<strong>Purpose:</strong> Teaching Practice (TP) E24 Assessment Management System
+
+---
+
+<h2 style="color: #5B9BD5;">1. AUTHENTICATION SYSTEM</h2>
+
+<h3 style="color: #70AD47;">Login Implementation</h3>
+
+<strong>Entry Point:</strong> <a href="views/site/index.php">site/index.php</a> - Login form and home page  
+<strong>LoginForm Model:</strong> <a href="models/LoginForm.php">models/LoginForm.php</a>
+
+<h4 style="color: #4F81BD;">Authentication Flow:</h4>
+1. <strong>User Lookup:</strong> `LoginForm::getUser()` searches by username or payroll number
+   ```php
+   // Accepts both username and payroll_no
+   public static function findByIdentifier($identifier)
+   ```
+
+2. <strong>Password Validation:</strong> Triple-layer validation in <a href="models/Users.php">Users.php</a>
+   - Direct plaintext comparison (legacy support)
+   - Yii Security hash verification (bcrypt)
+   - Demo account fallback (admin/admin, demo/demo)
+
+3. <strong>Session Management:</strong> Built-in Yii session handling
+   - Config: <a href="config/web.php">config/web.php</a> - component `user`
+   - Identity Class: `app\models\Users` (implements `IdentityInterface`)
+   - Auto-login: Configurable 30-day remember-me cookie
+
+<h4 style="color: #4F81BD;">Current User Access:</h4>
+```php
+// From any controller/view
+$user = Yii::$app-&gt;user-&gt;identity;  // Returns Users model
+$userId = Yii::$app-&gt;user-&gt;id;      // Returns user_id
+
+// Check authentication
+if (Yii::$app-&gt;user-&gt;isGuest) { /<em> redirect </em>/ }
+```
+
+---
+
+<h2 style="color: #5B9BD5;">2. USER ROLES &amp; ACCESS CONTROL</h2>
+
+<h3 style="color: #70AD47;">Role Architecture</h3>
+
+<strong>Role Model:</strong> <a href="models/Role.php">models/Role.php</a>  
+<strong>RBAC Helper:</strong> <a href="components/RbacHelper.php">components/RbacHelper.php</a>
+
+<h4 style="color: #4F81BD;">Four Primary Roles:</h4>
+
+<table border="1" cellspacing="0" cellpadding="5" style="border-collapse:collapse;"><tr><th style="background:#5B9BD5;color:#ffffff;">Role ID</th><th style="background:#5B9BD5;color:#ffffff;">Role Name</th><th style="background:#5B9BD5;color:#ffffff;">Description</th><th style="background:#5B9BD5;color:#ffffff;">Key Features</th><th style="background:#5B9BD5;color:#ffffff;"></th></tr><tr><td>1</td><td><strong>Supervisor</strong></td><td>Classroom teacher conducting assessments</td><td>Create/edit assessments, input grades, view own records</td><td></td></tr><tr><td>2</td><td><strong>Zone Coordinator</strong></td><td>District-level assessment validator</td><td>Review submitted assessments, validate completed work, view zone statistics</td><td></td></tr><tr><td>3</td><td><strong>TP Office</strong></td><td>Administrative assessment authority</td><td>System-wide reporting, data export, master data management, real-time dashboards</td><td></td></tr><tr><td>4</td><td><strong>Department Chair</strong></td><td>School leadership oversight</td><td>System-wide analytics, grade distribution reports, supervisor management, overall school statistics</td></tr></table>
+<h3 style="color: #70AD47;">Role Detection Methods</h3>
+
+```php
+// In RbacHelper::
+RbacHelper::isSupervisor()         // Returns boolean
+RbacHelper::isZoneCoordinator()    // Returns boolean
+RbacHelper::isTpOffice()           // Returns boolean
+RbacHelper::isDepartmentChair()    // Returns boolean
+
+// Generic lookup
+RbacHelper::hasRole(&#039;Supervisor&#039;)  // Check by name
+RbacHelper::getUserRole($roleId)   // Get role name from ID
+```
+
+<h3 style="color: #70AD47;">Access Control Implementation</h3>
+
+<strong>Framework:</strong> Yii2 `AccessControl` filter with `MatchCallback`
+
+<strong>Example:</strong> <a href="controllers/SupervisorController.php">controllers/SupervisorController.php</a>
+```php
+public function behaviors()
+{
+    return [
+        &#039;access&#039; =&gt; [
+            &#039;class&#039; =&gt; AccessControl::class,
+            &#039;rules&#039; =&gt; [
+                [
+                    &#039;allow&#039; =&gt; true,
+                    &#039;roles&#039; =&gt; [&#039;@&#039;],  // Authenticated only
+                    &#039;matchCallback&#039; =&gt; function($rule, $action) {
+                        $user = Yii::$app-&gt;user-&gt;identity;
+                        return $user &amp;&amp; $user-&gt;role_id == 1;  // Supervisor check
+                    }
+                ],
+            ],
+        ],
+    ];
+}
+```
+
+<h3 style="color: #70AD47;">Data Visibility Filtering</h3>
+
+<strong>AssessmentController</strong> filters based on role:<ul><li><strong>Supervisors:</strong> Only see own assessments (`examiner<em>user</em>id == current<em>user</em>id`)</li></ul></ul><li><strong>Zone Coordinators:</strong> See assessments from schools in their zone</li><li><strong>Department Chairs:</strong> See assessments from their school</li></ul></ul><li><strong>TP Office:</strong> See all assessments system-wide</li></ul>
+
+---
+
+<h2 style="color: #5B9BD5;">3. USER PROFILES</h2>
+
+<h3 style="color: #70AD47;">User Model Structure</h3>
+
+<strong>File:</strong> <a href="models/Users.php">models/Users.php</a>
+
+<h4 style="color: #4F81BD;">User Table Columns:</h4>
+```
+user_id (PK)
+role_id (FK → role table)
+username (unique)
+password (supports plain + hashed)
+payroll_no (optional, searchable)
+name
+phone
+status
+zone_id (FK → zone table, for Zone Coordinators)
+school_id (FK → school table, for Department Chairs)
+```
+
+<h3 style="color: #70AD47;">Profile Management Controllers</h3>
+
+<strong>Supervisor Profile:</strong> <a href="controllers/SupervisorController.php">controllers/SupervisorController.php</a><ul><li><strong>Actions:</strong></li></ul>
+  - `actionProfile()` - Display profile with assessment statistics
+  - `actionEdit()` - Edit profile information
+</ul><li><strong>Statistics Displayed:</strong></li></ul>
+  - Total assessments conducted
+  - Pending vs completed assessments
+  - Number of schools assessed
+  - Unique students evaluated
+  - Total grades entered
+  - Learning areas covered
+
+<strong>Zone Coordinator Profile:</strong> <a href="controllers/ZoneCoordinatorController.php">controllers/ZoneCoordinatorController.php</a><ul><li><strong>Actions:</strong></li></ul>
+  - `actionProfile()` - View validation workflow status
+  - `actionEdit()` - Edit profile
+  - `actionValidateAll()` - Bulk validation endpoint
+</ul><li><strong>Statistics:</strong></li></ul>
+  - Total assessments across zone
+  - Pending validations count
+  - Validated assessments count
+  - School count
+  - Unique students assessed
+  - Submitted assessments awaiting review
+  - Recently validated assessments
+
+<strong>TP Office Profile:</strong> <a href="controllers/TpOfficeController.php">controllers/TpOfficeController.php</a><ul><li><strong>Dashboard:</strong> Comprehensive system statistics and real-time monitoring</li></ul></ul><li><strong>AJAX Endpoint:</strong> `actionGetDashboardData()` for live updates</li><li><strong>Focus:</strong> Validated assessments, reports, system health metrics</li></ul>
+
+<strong>Department Chair Profile:</strong> <a href="controllers/DepartmentChairController.php">controllers/DepartmentChairController.php</a></ul><li><strong>Actions:</strong></li></ul>
+  - `actionProfile()` - Overview dashboard
+  - `actionEdit()` - Profile editing
+  - `actionSystemReports()` - Comprehensive analytics
+<ul><li><strong>Key Metrics:</strong></li></ul>
+  - Total/completed/in-progress assessments
+  - Average scores
+  - Schools and supervisor counts
+  - Grade distribution analysis
+
+<strong>Generic User Profile:</strong> <a href="controllers/UsersController.php">controllers/UsersController.php</a></ul><li>CRUD operations for user administration</li><li>Generic profile view accessible to any authenticated user</li></ul></ul><li>Assessment statistics tied to logged-in user</li></ul>
+
+---
+
+<h2 style="color: #5B9BD5;">4. DATABASE MODELS</h2>
+
+<h3 style="color: #70AD47;">Core Data Models</h3>
+
+<h4 style="color: #4F81BD;"><strong>Assessment</strong> <a href="models/Assessment.php">models/Assessment.php</a></h4>
+Central model for assessment records
+
+```
+assessment_id (PK)
+examiner<em>user</em>id (FK → users)
+student<em>reg</em>no
+school_id (FK → school)
+learning<em>area</em>id (FK → learning_area)
+assessment_date
+start<em>time, end</em>time
+total_score (calculated from grades)
+overall_level (BE/AE/ME/EE)
+archived (0=active, 1=submitted)
+archived_at (submission timestamp)
+validated_by (FK → users, null until approved)
+validated_at (approval timestamp)
+```
+
+<strong>Relations:</strong><ul><li>`hasMany(Grade)` - Multiple grades per assessment</li></ul></ul><li>`hasOne(Users)` - Examiner relationship</li><li>`hasOne(Users)` - Validator relationship (validated_by)</li></ul></ul><li>`hasOne(LearningArea)` - Learning domain</li><li>`hasOne(School)` - School location</li></ul>
+
+<h4 style="color: #4F81BD;"><strong>Users</strong> <a href="models/Users.php">models/Users.php</a></h4>
+User account model (IdentityInterface implementation)
+
+```
+user_id (PK)
+role_id (FK → role)
+username (unique)
+password
+payroll_no
+name
+phone
+status
+zone_id (for Zone Coordinators)
+school_id (for Department Chairs)
+```
+
+<strong>Relations:</strong></ul><li>`hasMany(Assessment)` - Assessments created by user</li><li>`hasOne(Role)` - User&#039;s role</li></ul></ul><li>`hasOne(Zone)` - User&#039;s zone (if applicable)</li><li>`hasOne(School)` - User&#039;s school (if applicable)</li></ul>
+
+<h4 style="color: #4F81BD;"><strong>Grade</strong> <a href="models/Grade.php">models/Grade.php</a></h4>
+Individual competency rating per assessment
+
+```
+grade_id (PK)
+assessment_id (FK)
+competence_id (FK)
+level (BE/AE/ME/EE - grading scale)
+score (0-10 numeric)
+remarks (text feedback)
+```
+
+<strong>TP E24 Grading Scale:</strong></ul><li><strong>BE (Below Expectations):</strong> 0-3 points</li><li><strong>AE (Approaching Expectations):</strong> 4-5 points</li></ul></ul><li><strong>ME (Meets Expectations):</strong> 6-7 points</li><li><strong>EE (Exceeds Expectations):</strong> 8-10 points</li></ul>
+
+<strong>Static Methods:</strong>
+```php
+Grade::getGradingScale()    // Returns scale definition
+Grade::getValidLevels()     // Returns [BE, AE, ME, EE]
+Grade::getLevelLabel($level) // Returns human-readable label
+```
+
+<h4 style="color: #4F81BD;"><strong>School</strong> <a href="models/School.php">models/School.php</a></h4>
+```
+school_id (PK)
+school_code (unique)
+school_name
+zone_id (FK → zone)
+```
+
+<h4 style="color: #4F81BD;"><strong>Zone</strong> <a href="models/Zone.php">models/Zone.php</a></h4>
+```
+zone_id (PK)
+zone_name
+```
+
+<h4 style="color: #4F81BD;"><strong>Role</strong> <a href="models/Role.php">models/Role.php</a></h4>
+```
+role_id (PK)
+role_name (Supervisor/Zone Coordinator/TP Office/Department Chair)
+```
+
+<h4 style="color: #4F81BD;"><strong>CompetenceArea</strong> <a href="models/CompetenceArea.php">models/CompetenceArea.php</a></h4>
+Assessment criteria/standards
+
+```
+competence_id (PK)
+competence_name
+description
+```
+
+<strong>Relations:</strong></ul><li>`hasMany(Grade)` - Grades containing this competence</li><li>`hasMany(Assessment)` - Via grades junction</li></ul>
+
+<h4 style="color: #4F81BD;"><strong>LearningArea</strong> <a href="models/LearningArea.php">models/LearningArea.php</a></h4>
+Curriculum domains (e.g., Mathematics, Language, etc.)
+
+```
+learning<em>area</em>id (PK)
+learning<em>area</em>name
+```
+
+<strong>Relations:</strong></ul><li>`hasMany(Assessment)` - Assessments in this area</li><li>`hasMany(Strand)` - Sub-domains within this area</li></ul>
+
+<h4 style="color: #4F81BD;"><strong>Strand</strong> <a href="models/Strand.php">models/Strand.php</a></h4>
+Curriculum strand (subdivision of learning area)
+
+```
+strand_id (PK)
+learning<em>area</em>id (FK)
+name
+```
+
+<strong>Relations:</strong></ul><li>`hasOne(LearningArea)` - Parent domain</li><li>`hasMany(Substrand)` - Sub-components</li></ul>
+
+<h4 style="color: #4F81BD;"><strong>Substrand</strong> <a href="models/Substrand.php">models/Substrand.php</a></h4>
+Lowest level of curriculum organization
+
+```
+substrand_id (PK)
+strand_id (FK)
+name
+```
+
+<h3 style="color: #70AD47;">Search Models</h3>
+
+Each major model has a corresponding `Search` class for filtering:</ul><li><a href="models/AssessmentSearch.php">models/AssessmentSearch.php</a></li><li><a href="models/UsersSearch.php">models/UsersSearch.php</a></li></ul></ul><li><a href="models/GradeSearch.php">models/GradeSearch.php</a></li><li><a href="models/RoleSearch.php">models/RoleSearch.php</a></li></ul></ul><li><a href="models/SchoolSearch.php">models/SchoolSearch.php</a></li><li><a href="models/ZoneSearch.php">models/ZoneSearch.php</a></li></ul></ul><li><a href="models/CompetenceAreaSearch.php">models/CompetenceAreaSearch.php</a></li><li><a href="models/LearningAreaSearch.php">models/LearningAreaSearch.php</a></li></ul></ul><li><a href="models/StrandSearch.php">models/StrandSearch.php</a></li><li><a href="models/SubstrandSearch.php">models/SubstrandSearch.php</a></li></ul>
+
+---
+
+<h2 style="color: #5B9BD5;">5. CONTROLLERS</h2>
+
+<h3 style="color: #70AD47;">Main Controllers</h3>
+
+<h4 style="color: #4F81BD;"><strong>SiteController</strong> <a href="controllers/SiteController.php">controllers/SiteController.php</a></h4>
+
+<strong>Actions:</strong></ul><li>`actionIndex()` - Login page/home redirect</li><li>`actionDashboard()` - Role-adaptive dashboard with cached statistics</li></ul></ul><li>`actionAbout()` - System information</li><li>`actionContact()` - Contact form</li></ul></ul><li>`actionError()` - Error page</li><li>`actionLogout()` - Session termination (POST only)</li></ul>
+
+<strong>Features:</strong></ul><li><strong>Dashboard Stats Caching:</strong> Session-based caching with timestamp validation</li><li><strong>Role-Based Stats:</strong></li></ul>
+  - Supervisors: Own assessments, schools, learning areas
+  - Admins/coordinators: System-wide statistics</ul><li><strong>Recent Assessments:</strong> Filtered display based on user role</li></ul>
+
+<h4 style="color: #4F81BD;"><strong>AssessmentController</strong> <a href="controllers/AssessmentController.php">controllers/AssessmentController.php</a></h4>
+
+<strong>Actions:</strong><ul><li>`actionIndex()` - List assessments (role-filtered)</li></ul></ul><li>`actionView($id)` - Display single assessment</li><li>`actionCreate()` - New assessment form</li></ul></ul><li>`actionUpdate($id)` - Edit assessment</li><li>`actionDelete($id)` - Remove assessment (POST)</li></ul></ul><li>`actionUploadImages($id)` - Image upload endpoint</li><li>`actionGradeGrid($id)` - Competency grading interface</li></ul></ul><li>`actionReportStudent($id)` - Student feedback report</li><li>`actionReportOffice($id)` - Administrative report</li></ul></ul><li>`actionAuditLog($id)` - Activity history</li><li>`actionSaveGrid()` - Grade grid auto-save (AJAX)</li></ul>
+
+<strong>Access Control:</strong> Authenticated users with role-based view filtering
+
+<strong>Features:</strong></ul><li><strong>Supervisor Ownership:</strong> Auto-claims unassigned assessments</li><li><strong>Report Generation:</strong> Multi-format reports for different audiences</li></ul></ul><li><strong>Audit Trails:</strong> Full change tracking and logging</li><li><strong>Grade Management:</strong> Inline grid-based data entry</li></ul>
+
+<h4 style="color: #4F81BD;"><strong>SupervisorController</strong> <a href="controllers/SupervisorController.php">controllers/SupervisorController.php</a></h4>
+
+<strong>Actions:</strong></ul><li>`actionProfile()` - View supervisor dashboard</li><li>`actionEdit()` - Update profile information</li></ul>
+
+<strong>Dashboard Data:</strong></ul><li>Total/pending/completed assessments</li><li>School and student counts</li></ul></ul><li>Learning area coverage</li><li>Recent assessment listing</li></ul>
+
+<h4 style="color: #4F81BD;"><strong>ZoneCoordinatorController</strong> <a href="controllers/ZoneCoordinatorController.php">controllers/ZoneCoordinatorController.php</a></h4>
+
+<strong>Actions:</strong></ul><li>`actionProfile()` - Validation workflow dashboard</li><li>`actionEdit()` - Profile management</li></ul></ul><li>`actionValidateAll()` - Bulk validation trigger</li></ul>
+
+<strong>Features:</strong><ul><li>Workflow status displays (submitted vs. validated)</li></ul></ul><li>Zone-specific filtering</li><li>Validation tracking</li></ul>
+
+<h4 style="color: #4F81BD;"><strong>TpOfficeController</strong> <a href="controllers/TpOfficeController.php">controllers/TpOfficeController.php</a></h4>
+
+<strong>Actions:</strong></ul><li>`actionIndex()` - Main dashboard with key metrics</li><li>`actionGetDashboardData()` - AJAX real-time updates</li></ul></ul><li>`actionGetReportsData()` - Report data refresh endpoint</li></ul>
+
+<strong>Real-Time Features:</strong><ul><li>Live assessment counters</li></ul></ul><li>Status change detection</li><li>Auto-updating dashboards</li></ul>
+
+<h4 style="color: #4F81BD;"><strong>DepartmentChairController</strong> <a href="controllers/DepartmentChairController.php">controllers/DepartmentChairController.php</a></h4>
+
+<strong>Actions:</strong></ul><li>`actionProfile()` - Comprehensive overview</li><li>`actionEdit()` - Profile updates</li></ul></ul><li>`actionSystemReports()` - Analytics dashboard</li></ul>
+
+<strong>Analytics:</strong><ul><li>Grade distribution analysis</li></ul></ul><li>Supervisor performance metrics</li><li>School-wide statistics</li></ul>
+
+<h4 style="color: #4F81BD;"><strong>UsersController</strong> <a href="controllers/UsersController.php">controllers/UsersController.php</a></h4>
+
+<strong>Actions:</strong></ul><li>CRUD: `actionIndex/View/Create/Update/Delete()`</li><li>`actionProfile()` - Current user dashboard</li></ul></ul><li>User management for administrative access</li></ul>
+
+<h4 style="color: #4F81BD;"><strong>ChatController</strong> <a href="controllers/ChatController.php">controllers/ChatController.php</a></h4>
+
+<strong>Actions:</strong><ul><li>`actionSend()` - AJAX chat message handler</li></ul>
+
+<strong>Features:</strong></ul><li>Session-based chat history (last 20 messages)</li><li>Error handling with fallback responses</li></ul></ul><li>Assessment context awareness</li></ul>
+
+---
+
+<h2 style="color: #5B9BD5;">6. VIEWS</h2>
+
+<h3 style="color: #70AD47;">View Directory Structure</h3>
+
+```
+views/
+├── layouts/
+│   ├── main.php (Primary layout)
+│   └── chat-widget.php (Chat interface)
+├── site/
+│   ├── index.php (Login/landing page)
+│   ├── dashboard.php (Role-adaptive dashboard)
+│   ├── login-guide.php (Help documentation)
+│   ├── error.php (Error display)
+│   ├── about.php, contact.php
+├── assessment/
+│   ├── index.php (Assessment list)
+│   ├── view.php (Assessment detail)
+│   ├── create.php, update.php (Forms)
+│   ├── grade-grid.php (Competency entry)
+│   ├── upload-images.php (Evidence upload)
+│   ├── report.php (Report template)
+│   ├── audit-log.php (Activity history)
+│   ├── _form.php (Shared form partial)
+│   ├── _search.php (Search filter)
+│   └── _grade-color.php (Grade visualization)
+├── supervisor/
+│   ├── supervisor-profile.php
+│   ├── edit-supervisor-profile.php
+│   └── select-student.php
+├── zone-coordinator/
+│   ├── zone-coordinator-profile.php
+│   └── edit-zone-coordinator-profile.php
+├── tp-office/
+│   ├── index.php (Dashboard)
+│   └── <em>recent</em>assessments_table.php
+├── department-chair/
+│   ├── department-chair-profile.php
+│   ├── edit-department-chair-profile.php
+│   └── system-reports.php
+├── users/ (CRUD views)
+├── role/, school/, zone/, grade/ (Master data management)
+└── [other controllers]/
+```
+
+<h3 style="color: #70AD47;">Key Layout Components</h3>
+
+<strong>main.php</strong> - Primary layout<ul><li>Fixed navbar with gradient background (blue)</li></ul></ul><li>Role-based navigation menu items</li><li>Dynamic menu construction based on `Yii::$app-&gt;user-&gt;identity-&gt;role_id`</li></ul></ul><li>Breadcrumb navigation</li><li>Content section with padding</li></ul></ul><li>Alert widget for flash messages</li></ul>
+
+<strong>chat-widget.php</strong> - Floating chat assistant<ul><li>Fixed position chat bubble</li></ul></ul><li>Message history display</li><li>AJAX message submission to `ChatController::actionSend()`</li></ul>
+
+---
+
+<h2 style="color: #5B9BD5;">7. KEY FEATURES</h2>
+
+<h3 style="color: #70AD47;">1. Assessment Management</h3>
+
+<strong>Creation Workflow:</strong>
+1. Supervisor initiates assessment for a student
+2. Selects learning area and school
+3. Enters assessment date, times, and student info
+4. System auto-generates competency grade entries
+
+<strong>Tracking States:</strong></ul><li>`archived = 0` - In-progress assessment</li><li>`archived = 1` - Submitted for review</li></ul></ul><li>`validated_by = null` - Pending validation</li><li>`validated<em>by = {user</em>id}` - Approved assessment</li></ul>
+
+<h3 style="color: #70AD47;">2. Grading System (TP E24 Template)</h3>
+
+<strong>Grade Entry:</strong></ul><li>Grid-based interface: <a href="views/assessment/grade-grid.php">views/assessment/grade-grid.php</a></li><li>AJAX auto-save to prevent data loss</li></ul></ul><li>Real-time validation against constraints</li><li>Automatic total score calculation</li></ul>
+
+<strong>Grading Scale:</strong>
+```
+BE (Below Expectations):      0-3 points → 0 grade_id
+AE (Approaching Expectations): 4-5 points → 1 grade_id
+ME (Meets Expectations):       6-7 points → 2 grade_id
+EE (Exceeds Expectations):     8-10 points → 3 grade_id
+```
+
+<h3 style="color: #70AD47;">3. Evidence Management</h3>
+
+<strong>Image Upload System:</strong> <a href="components/AssessmentImageBehavior.php">components/AssessmentImageBehavior.php</a>
+
+<strong>Specifications:</strong></ul><li>Storage: `web/uploads/assessments/{assessment_id}/`</li><li>Max 5 images per assessment</li></ul></ul><li>Supported formats: jpg, jpeg, png, gif, webp</li><li>Maximum file size: 5MB</li></ul></ul><li>Unique filename generation: `image<em>{timestamp}</em>{random}.{ext}`</li></ul>
+
+<strong>Upload Endpoint:</strong> `assessment/upload-images`
+
+<h3 style="color: #70AD47;">4. Audit Logging</h3>
+
+<strong>System:</strong> <a href="components/AuditLogger.php">components/AuditLogger.php</a>
+
+<strong>Log Entries Include:</strong><ul><li>Timestamp (both human-readable and Unix)</li></ul></ul><li>Action type (create, update, delete, submit, review, approve)</li><li>Entity type and ID</li></ul></ul><li>User ID, name, and role</li><li>IP address</li></ul></ul><li>Change details (before/after values)</li><li>Additional notes</li></ul>
+
+<strong>Storage:</strong> `runtime/audit-logs/{YYYY-MM-DD}_audit.log`</ul><li>JSON line format (one entry per line)</li><li>Organized by date</li></ul></ul><li>Retrievable by entity for audit trail</li></ul>
+
+<strong>API:</strong>
+```php
+AuditLogger::log($action, $entityType, $entityId, $changes, $notes);
+AuditLogger::getEntityLogs($entityType, $entityId, $days = 30);
+AuditLogger::getRecentLogs($limit = 100);
+```
+
+<h3 style="color: #70AD47;">5. Real-Time Chat Assistant</h3>
+
+<strong>Service:</strong> <a href="components/ChatService.php">components/ChatService.php</a>
+
+<strong>Capabilities:</strong><ul><li>TP E24 grading scale guidance</li></ul></ul><li>Competency standards explanation</li><li>Assessment methodology tips</li></ul></ul><li>General knowledge responses (ChatGPT-style)</li><li>Statistics queries (&quot;How many students?&quot;)</li></ul></ul><li>System help and workflow guidance</li></ul>
+
+<strong>Message Processing:</strong>
+1. Keyword detection for domain-specific queries
+2. Context-aware response generation
+3. Assessment-specific responses if assessment ID provided
+4. Fallback to general knowledge for unclassified queries
+
+<strong>Session Integration:</strong><ul><li>Chat history stored in `Yii::$app-&gt;session[&#039;chatHistory&#039;]`</li></ul></ul><li>Last 20 messages retained</li><li>User context preserved across messages</li></ul>
+
+<h3 style="color: #70AD47;">6. Notification System</h3>
+
+<strong>Service:</strong> <a href="components/NotificationService.php">components/NotificationService.php</a>
+
+<strong>Notification Types:</strong>
+```php
+const TYPE<em>ASSESSMENT</em>CREATED = &#039;assessment_created&#039;;
+const TYPE<em>ASSESSMENT</em>UPDATED = &#039;assessment_updated&#039;;
+const TYPE<em>ASSESSMENT</em>SUBMITTED = &#039;assessment_submitted&#039;;
+const TYPE<em>GRADES</em>ADDED = &#039;grades_added&#039;;
+const TYPE<em>FEEDBACK</em>READY = &#039;feedback_ready&#039;;
+const TYPE<em>REVIEW</em>REQUIRED = &#039;review_required&#039;;
+const TYPE<em>REPORT</em>GENERATED = &#039;report_generated&#039;;
+const TYPE<em>STUDENT</em>SELECTED = &#039;student_selected&#039;;
+const TYPE<em>EVIDENCE</em>UPLOADED = &#039;evidence_uploaded&#039;;
+const TYPE<em>ASSESSMENT</em>COMPLETED = &#039;assessment_completed&#039;;
+```
+
+<strong>Trigger Points:</strong></ul><li>Assessment lifecycle events (create, submit, validate)</li><li>Grading completion</li></ul></ul><li>Report generation</li><li>Evidence uploads</li></ul>
+
+<h3 style="color: #70AD47;">7. Multi-Role Dashboards</h3>
+
+<strong>Adaptive Dashboard:</strong> <a href="views/site/dashboard.php">views/site/dashboard.php</a>
+
+<strong>Display Variations:</strong></ul><li><strong>Supervisor:</strong> Personal assessment statistics</li><li><strong>Zone Coordinator:</strong> Validation queue and metrics</li></ul></ul><li><strong>TP Office:</strong> System-wide dashboards with real-time updates</li><li><strong>Department Chair:</strong> School analytics and performance insights</li></ul>
+
+<strong>Caching:</strong> Dashboard stats cached in session with timestamp validation
+
+<h3 style="color: #70AD47;">8. Reporting</h3>
+
+<strong>Report Types:</strong>
+
+<strong>StudentReport</strong> `assessment/report-student`</ul><li>Individual student assessment summary</li><li>Competency-level grades</li></ul></ul><li>Written feedback</li><li>Performance level (overall_level)</li></ul>
+
+<strong>OfficeReport</strong> `assessment/report-office`</ul><li>Aggregated school/zone data</li><li>Grade distribution analysis</li></ul></ul><li>Submission status tracking</li></ul>
+
+<strong>SystemReports</strong> (Department Chair)<ul><li>School-wide statistics</li></ul></ul><li>Supervisor performance metrics</li><li>Grade distribution charts</li></ul>
+
+---
+
+<h2 style="color: #5B9BD5;">8. CONFIGURATION FILES</h2>
+
+<h3 style="color: #70AD47;">Application Configuration</h3>
+
+<strong>Main Config:</strong> <a href="config/web.php">config/web.php</a>
+
+<h4 style="color: #4F81BD;">Components Configuration:</h4>
+
+<strong>request</strong>
+```php
+&#039;cookieValidationKey&#039; =&gt; &#039;T-9jIKyfNuocri1Bwa8p4hcX6_3F3xAH&#039;
+```
+
+<strong>user</strong> (Authentication)
+```php
+&#039;identityClass&#039; =&gt; &#039;app\models\Users&#039;
+&#039;enableAutoLogin&#039; =&gt; true
+```
+
+<strong>db</strong> (Database Connection)</ul><li>Loaded from <a href="config/db.php">config/db.php</a></li></ul>
+
+<strong>cache</strong>
+```php
+&#039;class&#039; =&gt; &#039;yii\caching\FileCache&#039;
+```
+
+<strong>log</strong> (Logging)
+```php
+&#039;targets&#039; =&gt; [
+    [
+        &#039;class&#039; =&gt; &#039;yii\log\FileTarget&#039;,
+        &#039;levels&#039; =&gt; [&#039;error&#039;, &#039;warning&#039;],
+    ],
+]
+```
+
+<strong>mailer</strong> (Email)
+```php
+&#039;class&#039; =&gt; \yii\symfonymailer\Mailer::class
+&#039;useFileTransport&#039; =&gt; true
+```
+
+<strong>urlManager</strong> (Routing)
+```php
+&#039;enablePrettyUrl&#039; =&gt; true
+&#039;showScriptName&#039; =&gt; false
+// Custom rules for assessment routes
+&#039;assessment/view/&lt;id:\d+&gt;&#039; =&gt; &#039;assessment/view&#039;
+&#039;assessment/grade-grid/&lt;id:\d+&gt;&#039; =&gt; &#039;assessment/grade-grid&#039;
+// ... etc
+```
+
+<h3 style="color: #70AD47;">Database Configuration</h3>
+
+<strong>File:</strong> <a href="config/db.php">config/db.php</a>
+
+```php
+[
+    &#039;class&#039; =&gt; &#039;yii\db\Connection&#039;,
+    &#039;dsn&#039; =&gt; &#039;pgsql:host=localhost;port=5432;dbname=tp_assessment&#039;,
+    &#039;username&#039; =&gt; &#039;postgres&#039;,
+    &#039;password&#039; =&gt; &#039;kabish&#039;,
+    &#039;charset&#039; =&gt; &#039;utf8&#039;,
+]
+```
+
+<strong>Database:</strong> PostgreSQL
+<strong>Host:</strong> localhost
+<strong>Port:</strong> 5432
+<strong>Name:</strong> tp_assessment
+
+<h3 style="color: #70AD47;">Application Parameters</h3>
+
+<strong>File:</strong> <a href="config/params.php">config/params.php</a>
+
+```php
+[
+    &#039;adminEmail&#039; =&gt; &#039;admin@example.com&#039;,
+    &#039;senderEmail&#039; =&gt; &#039;noreply@example.com&#039;,
+    &#039;senderName&#039; =&gt; &#039;Example.com mailer&#039;,
+]
+```
+
+<h3 style="color: #70AD47;">Environment-Specific Config</h3>
+
+<strong>Development Mode:</strong><ul><li>Debug Module enabled</li></ul></ul><li>Gii (code generator) enabled</li><li>Enhanced logging</li></ul></ul><li>Schema cache disabled</li></ul>
+
+---
+
+<h2 style="color: #5B9BD5;">9. COMPONENT CLASSES</h2>
+
+<h3 style="color: #70AD47;">RbacHelper <a href="components/RbacHelper.php">components/RbacHelper.php</a></h3>
+
+<strong>Purpose:</strong> Centralized role-based access control
+
+<strong>Key Methods:</strong>
+```php
+// Role name lookup
+static::hasRole($roleName) : bool
+static::getUserRole($roleId) : string|null
+
+// Specific role checks
+static::isSupervisor() : bool
+static::isZoneCoordinator() : bool
+static::isTpOffice() : bool
+static::isDepartmentChair() : bool
+```
+
+<strong>Usage:</strong>
+```php
+if (RbacHelper::isSupervisor()) {
+    // Show supervisor-only content
+}
+```
+
+<h3 style="color: #70AD47;">AuditLogger <a href="components/AuditLogger.php">components/AuditLogger.php</a></h3>
+
+<strong>Purpose:</strong> Comprehensive activity logging and audit trail
+
+<strong>Log Structure:</strong>
+```json
+{
+    &quot;timestamp&quot;: &quot;2024-04-07 10:30:45&quot;,
+    &quot;action&quot;: &quot;update&quot;,
+    &quot;entity_type&quot;: &quot;assessment&quot;,
+    &quot;entity_id&quot;: 123,
+    &quot;user_id&quot;: 5,
+    &quot;user_name&quot;: &quot;John Supervisor&quot;,
+    &quot;user_role&quot;: &quot;Supervisor&quot;,
+    &quot;ip_address&quot;: &quot;192.168.1.100&quot;,
+    &quot;changes&quot;: {&quot;total_score&quot;: [75, 80]},
+    &quot;notes&quot;: &quot;Grade adjustment&quot;,
+    &quot;timestamp_unix&quot;: 1712500245
+}
+```
+
+<strong>Public Methods:</strong>
+```php
+static::log($action, $entityType, $entityId, $changes, $notes) : bool
+static::getEntityLogs($entityType, $entityId, $days) : array
+static::getRecentLogs($limit) : array
+```
+
+<h3 style="color: #70AD47;">ChatService <a href="components/ChatService.php">components/ChatService.php</a></h3>
+
+<strong>Purpose:</strong> AI-powered chatbot for assessment guidance
+
+<strong>Processing Pipeline:</strong>
+1. Input validation and trimming
+2. Greeting detection (hello, hi, hey, etc.)
+3. Keyword-based topic routing:
+   - TP E24 grading scale questions
+   - Competency standards
+   - Assessment methodology
+   - Statistics/data queries
+   - System help
+   - General knowledge
+
+<strong>Response Methods:</strong>
+```php
+public function generateResponse($message, $context, $user, $assessmentId) : string
+
+// Internal routing methods:
+private function gradeResponse($message) : string
+private function competencyResponse($message) : string
+private function assessmentResponse($message, $assessment) : string
+private function helpResponse($message) : string
+private function generalKnowledgeResponse($message, $user) : string
+private function handleStatsQuery($message, $user) : string
+```
+
+<strong>Context Awareness:</strong><ul><li>User name and role integration</li></ul></ul><li>Assessment-specific guidance when assessment ID provided</li><li>Learning area context from assessment</li></ul>
+
+<h3 style="color: #70AD47;">NotificationService <a href="components/NotificationService.php">components/NotificationService.php</a></h3>
+
+<strong>Purpose:</strong> Event-driven notification system
+
+<strong>Notification Constants:</strong></ul><li>`TYPE<em>ASSESSMENT</em>CREATED`</li><li>`TYPE<em>ASSESSMENT</em>UPDATED`</li></ul></ul><li>`TYPE<em>ASSESSMENT</em>SUBMITTED`</li><li>`TYPE<em>GRADES</em>ADDED`</li></ul></ul><li>`TYPE<em>FEEDBACK</em>READY`</li><li>`TYPE<em>REVIEW</em>REQUIRED`</li></ul></ul><li>`TYPE<em>REPORT</em>GENERATED`</li><li>`TYPE<em>STUDENT</em>SELECTED`</li></ul></ul><li>`TYPE<em>EVIDENCE</em>UPLOADED`</li><li>`TYPE<em>ASSESSMENT</em>COMPLETED`</li></ul>
+
+<strong>Event Triggers:</strong>
+```php
+NotificationService::notifyAssessmentCreated(Assessment)
+NotificationService::notifyGradesComplete(Assessment)
+NotificationService::notifyFeedbackReady(Assessment)
+NotificationService::notifyReviewRequired(Assessment)
+```
+
+<strong>Recipient Logic:</strong></ul><li>Notifications delivered to role-specific users</li><li>Zone Coordinators notified for review tasks</li></ul></ul><li>Supervisors notified of assessment events</li><li>TP Office notified for system-wide events</li></ul>
+
+<h3 style="color: #70AD47;">AssessmentImageBehavior <a href="components/AssessmentImageBehavior.php">components/AssessmentImageBehavior.php</a></h3>
+
+<strong>Purpose:</strong> Evidence image management and validation
+
+<strong>Constraints:</strong></ul><li>Maximum 5 images per assessment</li><li>Allowed formats: jpg, jpeg, png, gif, webp</li></ul></ul><li>Maximum size: 5MB per image</li><li>Storage: `/web/uploads/assessments/{assessment_id}/`</li></ul>
+
+<strong>Key Methods:</strong>
+```php
+static::uploadImages(Assessment, UploadedFile[]) : array
+static::getImages($assessmentId) : array
+static::deleteImage($assessmentId, $filename) : bool
+static::getUploadDir($assessmentId) : string
+static::getUploadUrl($assessmentId) : string
+```
+
+<strong>File Naming:</strong> `image<em>{timestamp}</em>{randomInt}.{ext}`
+
+<strong>Usage Example:</strong>
+```php
+$files = UploadedFile::getInstances($model, &#039;images&#039;);
+$uploaded = AssessmentImageBehavior::uploadImages($assessment, $files);
+```
+
+---
+
+<h2 style="color: #5B9BD5;">10. IMPORTANT WIDGETS</h2>
+
+<h3 style="color: #70AD47;">Chat Widget <a href="views/layouts/chat-widget.php">views/layouts/chat-widget.php</a></h3>
+
+<strong>Functionality:</strong> Floating chatbot interface
+
+<strong>Features:</strong></ul><li>Fixed position on page</li><li>Message history display</li></ul></ul><li>Expandable/collapsible interface</li><li>AJAX communication with ChatController</li></ul></ul><li>Assessment context awareness</li></ul>
+
+<strong>Trigger:</strong> Post message to `/chat/send` endpoint
+
+<h3 style="color: #70AD47;">Navigation Menu</h3>
+
+<strong>Location:</strong> <a href="views/layouts/main.php">views/layouts/main.php</a>
+
+<strong>Dynamic Menu Items Based on Role:</strong>
+
+```php
+// Supervisor (role_id = 1)
+&#039;Assessments&#039; &gt; &#039;Create Assessment&#039;, &#039;My Assessments&#039;, &#039;Assessment Search&#039;
+
+// Zone Coordinator (role_id = 2)
+Navigation shows validation workflow items
+
+// TP Office (role_id = 3)
+&#039;TP Office&#039; &gt; Dashboard, Reports, Master Data, Archive Management
+
+// Department Chair (role_id = 4)
+System Reports, School Management, Supervisor Oversight
+```
+
+<h3 style="color: #70AD47;">Alert Widget</h3>
+
+<strong>Component:</strong> `yii\bootstrap5\Alert`
+
+<strong>Use:</strong> Display flash messages (success, error, warning, info)
+
+<strong>Integration:</strong>
+```php
+Yii::$app-&gt;session-&gt;setFlash(&#039;success&#039;, &#039;Action completed!&#039;);
+// Automatically displayed in views via Alert widget
+```
+
+<h3 style="color: #70AD47;">Breadcrumb Navigation</h3>
+
+<strong>Component:</strong> `yii\bootstrap5\Breadcrumbs`
+
+<strong>Dynamic Path Generation:</strong> Automatically built from controller/action routing
+
+---
+
+<h2 style="color: #5B9BD5;">DATABASE MIGRATIONS</h2>
+
+<h3 style="color: #70AD47;">Migration Files</h3>
+
+<strong>Location:</strong> <a href="migrations/">migrations/</a>
+
+<h4 style="color: #4F81BD;">Archive System Migrations:</h4><ul><li>`m260401<em>125702</em>add<em>archive</em>columns<em>to</em>assessment` - Adds `archived`, `archived_at` columns</li></ul></ul><li>`m260401<em>130350</em>add<em>archived</em>columns<em>to</em>assessment` - Duplicate/alternative version</li><li>`m260401<em>130406</em>add<em>archived</em>columns<em>to</em>assessment` - Alternative version</li></ul>
+
+<strong>Purpose:</strong> Track assessment submission and validation workflow
+
+<h4 style="color: #4F81BD;">Zone/School Assignment:</h4></ul><li>`m260402<em>114038</em>add<em>zone</em>school<em>to</em>users` - Adds `zone<em>id`, `school</em>id` columns to users</li></ul>
+
+<strong>Purpose:</strong> Support zone/school-based access control
+
+<h4 style="color: #4F81BD;">Examiner/Validator Assignment:</h4><ul><li>`m260403<em>110000</em>backfill<em>assessment</em>examiner<em>user</em>id` - Populates examiner relationship</li></ul></ul><li>`m260403<em>add</em>validated<em>by</em>to<em>assessment` - Adds `validated</em>by`, `validated_at` columns</li></ul>
+
+<strong>Purpose:</strong> Track who conducted and approved assessments
+
+---
+
+<h2 style="color: #5B9BD5;">APPLICATION BOOTSTRAP</h2>
+
+<strong>Bootstrap Process:</strong>
+
+1. <strong>Entry Point:</strong> `index.php` (front controller)
+2. <strong>Configuration Loading:</strong> Loads appropriate config based on environment
+   - Development: `config/test.php` or `config/web.php`
+   - Production: `config/web.php`
+3. <strong>Database Connection:</strong> PostgreSQL connection from `config/db.php`
+4. <strong>Component Initialization:</strong> Services and helpers instantiated
+5. <strong>Router Processing:</strong> Pretty URL routing via `urlManager`
+6. <strong>Access Control:</strong> Applied at controller level via `AccessControl` filter
+7. <strong>Session Management:</strong> Cookie-based with optional auto-login
+
+---
+
+<h2 style="color: #5B9BD5;">SECURITY FEATURES</h2>
+
+<h3 style="color: #70AD47;">Password Management</h3>
+
+<strong>Dual Support:</strong>
+1. <strong>Plaintext Check</strong> (legacy/demo)
+2. <strong>Yii Security Hash</strong> (bcrypt) - preferred
+3. <strong>Demo Account</strong> - fallback for testing
+
+<strong>Validation Logic</strong> (<a href="models/Users.php">models/Users.php</a>):
+```php
+public function validatePassword($password)
+{
+    // Try plaintext
+    if ($this-&gt;password === $password) return true;
+    
+    // Try bcrypt
+    if (Yii::$app-&gt;security-&gt;validatePassword($password, $this-&gt;password)) 
+        return true;
+    
+    // Try demo accounts
+    if (($this-&gt;username === &#039;admin&#039; &amp;&amp; $password === &#039;admin&#039;) || 
+        ($this-&gt;username === &#039;demo&#039; &amp;&amp; $password === &#039;demo&#039;)) 
+        return true;
+    
+    return false;
+}
+```
+
+<h3 style="color: #70AD47;">CSRF Protection</h3>
+
+<strong>Configuration:</strong> Cookie validation key in `web.php`
+<strong>Meta Tags:</strong> Auto-generated in main layout
+
+<h3 style="color: #70AD47;">Access Control</h3>
+
+<strong>Multi-Layer Approach:</strong>
+1. Authentication check (logged-in user required)
+2. Role verification (role_id matching)
+3. Ownership verification (own assessments only for supervisors)
+4. Zone/school verification (zone/school coordinators)
+
+<h3 style="color: #70AD47;">RBAC (Role-Based Access Control)</h3>
+
+<strong>Implementation:</strong> Yii2 `AccessControl` filter with custom `matchCallback`
+
+<strong>Role Hierarchy:</strong><ul><li>TP Office (role_id=3) - System-wide access</li></ul></ul><li>Zone Coordinator (role_id=2) - Zone-level access</li><li>Department Chair (role_id=4) - School-level access</li></ul></ul><li>Supervisor (role_id=1) - Own records only</li></ul>
+
+---
+
+<h2 style="color: #5B9BD5;">DEVELOPMENT HELPERS</h2>
+
+<h3 style="color: #70AD47;">Yii Debug Module</h3>
+
+<strong>Enabled in Development:</strong><ul><li>Accessible at `/_debug/`</li></ul></ul><li>Database query inspection</li><li>Log review</li></ul></ul><li>Performance profiling</li></ul>
+
+<h3 style="color: #70AD47;">Code Generation (Gii)</h3>
+
+<strong>Enabled in Development:</strong><ul><li>Model generation from existing tables</li></ul></ul><li>CRUD scaffolding</li><li>Form generation</li></ul></ul><li>Accessible at `/gii/`</li></ul>
+
+---
+
+<h2 style="color: #5B9BD5;">KEY WORKFLOWS</h2>
+
+<h3 style="color: #70AD47;">Assessment Submission Workflow</h3>
+
+```
+1. Supervisor creates Assessment (archived=0)
+2. Supervisor enters grades via grade-grid
+3. Supervisor uploads evidence images
+4. Supervisor submits (archived=1)
+5. Zone Coordinator validates (validated<em>by set, validated</em>at set)
+6. TP Office generates reports and exports
+7. Audit log captures all changes
+```
+
+<h3 style="color: #70AD47;">Real-Time Dashboard Updates</h3>
+
+```
+TP Office Dashboard (actionIndex) 
+→ Polls actionGetDashboardData() via AJAX
+→ Checks for assessments updated since last_update timestamp
+→ Returns updated HTML snippets if new assessments found
+→ Frontend updates assessment table dynamically
+```
+
+<h3 style="color: #70AD47;">Chat Assistance Workflow</h3>
+
+```
+User submits message via chat widget
+→ POST to ChatController::actionSend()
+→ ChatService::generateResponse() processes message
+→ Keyword routing selects response type
+→ Assessment context incorporated if available
+→ Response returned as JSON
+→ Chat history updated in session (max 20 messages)
+→ Frontend displays response in chat UI
+```
+
+---
+
+<h2 style="color: #5B9BD5;">PERFORMANCE CONSIDERATIONS</h2>
+
+<h3 style="color: #70AD47;">Session Caching</h3>
+
+<strong>Dashboard Statistics:</strong><ul><li>Cached in `Yii::$app-&gt;session[&#039;dashboardStats&#039;]`</li></ul></ul><li>Timestamp tracked in `dashboardStats_time`</li><li>Prevents repeated database queries for analytics</li></ul>
+
+<h3 style="color: #70AD47;">Query Optimization</h3>
+
+<strong>Active Query Usage:</strong></ul><li>Eager loading via `hasMany()`, `hasOne()`</li><li>Select distinct only needed columns</li></ul></ul><li>Limit result sets (e.g., `limit(20)` for recent items)</li></ul>
+
+<strong>Indexing Strategy:</strong><ul><li>Primary keys on all tables</li></ul></ul><li>Foreign key indexes</li><li>Consider indexes on:</li></ul>
+  - `assessment.examiner<em>user</em>id`
+  - `assessment.school_id`
+  - `assessment.archived`
+  - `grade.assessment_id`
+  - `grade.competence_id`
+
+---
+
+<h2 style="color: #5B9BD5;">DEPLOYMENT NOTES</h2>
+
+<h3 style="color: #70AD47;">Prerequisites</h3>
+</ul><li>PHP 7.4 + (Yii 2 framework requirement)</li><li>PostgreSQL 10+</li></ul></ul><li>Web server (Apache/Nginx with mod_rewrite)</li><li>Writable directories:</li></ul>
+  - `runtime/` - for logs and cache
+  - `web/uploads/` - for image uploads
+  - `runtime/audit-logs/` - for audit trail
+
+<h3 style="color: #70AD47;">Configuration Requirements</h3>
+
+1. Set database credentials in <a href="config/db.php">config/db.php</a>
+2. Update `cookieValidationKey` in <a href="config/web.php">config/web.php</a> to random string
+3. Update email settings in <a href="config/params.php">config/params.php</a>
+4. Run migrations: `php yii migrate`
+5. Seed master data (competencies, zones, schools, roles)
+
+<h3 style="color: #70AD47;">File Permissions</h3>
+
+```bash
+chmod 777 runtime/
+chmod 777 runtime/audit-logs/
+chmod 777 web/uploads/
+chmod 777 web/uploads/assessments/
+```
+
+---
+
+<h2 style="color: #5B9BD5;">TESTING UTILITIES</h2>
+
+<strong>Demo Scripts in Root:</strong></ul><li>`test_pdf.php` - PDF generation testing</li><li>`test_chatbot.php` - Chat service testing</li></ul></ul><li>`test_models.php` - Model relationship testing</li><li>`test<em>user</em>roles.php` - RBAC verification</li></ul></ul><li>`debug<em>chat.php`, `debug</em>chat2.php` - Chat debugging</li></ul>
+
+<strong>Database Inspection:</strong><ul><li>`temp<em>db</em>schema.php` - Display table structure</li></ul></ul><li>`temp<em>db</em>inspect.php` - Database analysis</li><li>`check_db.php` - Basic connectivity check</li></ul>
+
+---
+
+<h2 style="color: #5B9BD5;">SUMMARY TABLE</h2>
+
+<table border="1" cellspacing="0" cellpadding="5" style="border-collapse:collapse;"><tr><th style="background:#5B9BD5;color:#ffffff;">Component</th><th style="background:#5B9BD5;color:#ffffff;">Location</th><th style="background:#5B9BD5;color:#ffffff;">Purpose</th><th style="background:#5B9BD5;color:#ffffff;"></th></tr><tr><td><strong>Authentication</strong></td><td>LoginForm, Users</td><td>User login &amp; session management</td><td></td></tr><tr><td><strong>RBAC</strong></td><td>RbacHelper</td><td>Role-based access control</td><td></td></tr><tr><td><strong>Assessments</strong></td><td>Assessment, AssessmentController</td><td>Core assessment tracking</td><td></td></tr><tr><td><strong>Grading</strong></td><td>Grade, grade-grid.php</td><td>TP E24 competency grading</td><td></td></tr><tr><td><strong>Audit</strong></td><td>AuditLogger</td><td>Activity logging and trails</td><td></td></tr><tr><td><strong>Chat</strong></td><td>ChatService, ChatController</td><td>AI-powered chatbot</td><td></td></tr><tr><td><strong>Images</strong></td><td>AssessmentImageBehavior</td><td>Evidence upload management</td><td></td></tr><tr><td><strong>Notifications</strong></td><td>NotificationService</td><td>Event-based notifications</td><td></td></tr><tr><td><strong>Reports</strong></td><td>Various controllers</td><td>Multi-format reporting</td><td></td></tr><tr><td><strong>Real-Time</strong></td><td>AJAX endpoints</td><td>Live dashboard updates</td></tr></table>
+---
+
+<h2 style="color: #5B9BD5;">API ENDPOINTS SUMMARY</h2>
+
+<h3 style="color: #70AD47;">Assessment Management</h3></ul><li>`GET /assessment` - List assessments</li><li>`GET /assessment/view/{id}` - View single assessment</li></ul></ul><li>`POST /assessment/create` - Create assessment</li><li>`POST /assessment/update/{id}` - Update assessment</li></ul></ul><li>`POST /assessment/delete/{id}` - Delete assessment</li></ul>
+
+<h3 style="color: #70AD47;">Grading</h3><ul><li>`GET /assessment/grade-grid/{id}` - Grade entry interface</li></ul></ul><li>`POST /assessment/save-grid` - Auto-save grades (AJAX)</li></ul>
+
+<h3 style="color: #70AD47;">Evidence</h3><ul><li>`POST /assessment/upload-images/{id}` - Upload evidence images</li></ul>
+
+<h3 style="color: #70AD47;">Reports</h3></ul><li>`GET /assessment/report-student/{id}` - Student report</li><li>`GET /assessment/report-office/{id}` - Administrative report</li></ul></ul><li>`GET /assessment/audit-log/{id}` - Activity history</li></ul>
+
+<h3 style="color: #70AD47;">Chat</h3><ul><li>`POST /chat/send` - Send chat message (AJAX)</li></ul>
+
+<h3 style="color: #70AD47;">Dashboards</h3></ul><li>`GET /site/dashboard` - Role-adaptive dashboard</li><li>`POST /tp-office/get-dashboard-data` - Real-time stats (AJAX)</li></ul></ul><li>`POST /tp-office/get-reports-data` - Report updates (AJAX)</li><li>`GET /supervisor/profile` - Supervisor dashboard</li></ul></ul><li>`GET /zone-coordinator/profile` - Zone coordinator dashboard</li><li>`GET /department-chair/profile` - Chair dashboard</li></ul>
+
+---
+
+<strong>Document Version:</strong> 1.0  
+<strong>Last Updated:</strong> April 7, 2026  
+<strong>System Status:</strong> Production Ready</p>
+</body>
+</html>

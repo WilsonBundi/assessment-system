@@ -1,0 +1,1326 @@
+<?php
+
+/** @var yii\web\View $this */
+/** @var array $stats Dashboard statistics from session */
+
+use yii\bootstrap5\Html;
+use app\components\RbacHelper;
+use app\models\Assessment;
+
+$this->title = 'Dashboard';
+?>
+
+<style>
+    .dashboard-page {
+        padding: 30px 0;
+    }
+
+    .dashboard-header {
+        margin-bottom: 40px;
+    }
+
+    .dashboard-header h1 {
+        font-size: 2.5rem;
+        color: #1a1a1a;
+        font-weight: 800;
+        margin-bottom: 10px;
+    }
+
+    .dashboard-header p {
+        color: #666;
+        font-size: 1.1rem;
+    }
+
+    .stat-card {
+        background: white;
+        border-radius: 10px;
+        padding: 30px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        text-align: center;
+        margin-bottom: 30px;
+        border-top: 4px solid #5B9BD5;
+        transition: all 0.3s ease;
+    }
+
+    .stat-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 8px 20px rgba(0,0,0,0.12);
+    }
+
+    .stat-number {
+        font-size: 2.5rem;
+        font-weight: 800;
+        color: #5B9BD5;
+        margin: 15px 0;
+    }
+
+    .stat-label {
+        color: #666;
+        font-size: 1rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .module-section {
+        margin: 50px 0;
+    }
+
+    .module-section h2 {
+        font-size: 1.8rem;
+        color: #1a1a1a;
+        margin-bottom: 25px;
+        font-weight: 700;
+        border-bottom: 3px solid #5B9BD5;
+        padding-bottom: 15px;
+        display: inline-block;
+    }
+
+    .module-card {
+        background: white;
+        border-radius: 10px;
+        padding: 25px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        margin-bottom: 20px;
+        transition: all 0.3s ease;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        border-left: 5px solid #5B9BD5;
+    }
+
+    .module-card:hover {
+        box-shadow: 0 8px 20px rgba(0,0,0,0.12);
+        transform: translateX(5px);
+    }
+
+    .module-info h3 {
+        font-size: 1.3rem;
+        color: #1a1a1a;
+        margin: 0 0 8px 0;
+        font-weight: 700;
+    }
+
+    .module-info p {
+        color: #666;
+        margin: 0;
+        font-size: 0.95rem;
+    }
+
+    .module-action {
+        display: flex;
+        gap: 10px;
+    }
+
+    .module-icon {
+        font-size: 2rem;
+        margin-right: 20px;
+    }
+
+    .btn-module {
+        padding: 10px 20px;
+        border-radius: 6px;
+        text-decoration: none;
+        font-weight: 600;
+        transition: all 0.3s ease;
+        display: inline-block;
+    }
+
+    .btn-module:first-of-type {
+        background: linear-gradient(135deg, #5B9BD5, #2E75B6);
+        color: white;
+    }
+
+    .btn-module:first-of-type:hover {
+        background: linear-gradient(135deg, #4a8bc2, #1f62a3);
+        transform: translateY(-2px);
+    }
+
+    .btn-module:last-of-type {
+        background: #f0f8ff;
+        color: #2E75B6;
+        border: 2px solid #5B9BD5;
+    }
+
+    .btn-module:last-of-type:hover {
+        background: #e6f0ff;
+        color: #1f62a3;
+        border-color: #2E75B6;
+        transform: translateY(-2px);
+    }
+
+    .welcome-banner {
+        background: linear-gradient(135deg, #5B9BD5 0%, #2E75B6 100%);
+        color: white;
+        padding: 40px;
+        border-radius: 10px;
+        margin-bottom: 40px;
+        box-shadow: 0 4px 15px rgba(91, 155, 213, 0.3);
+    }
+
+    .welcome-banner h2 {
+        font-size: 1.8rem;
+        color: white;
+        margin-bottom: 10px;
+        font-weight: 700;
+    }
+
+    .welcome-banner p {
+        color: rgba(255,255,255,0.95);
+        font-size: 1rem;
+        margin: 0;
+    }
+
+    @media (max-width: 768px) {
+        .module-card {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+
+        .module-action {
+            margin-top: 15px;
+            width: 100%;
+        }
+
+        .btn-module {
+            display: block;
+            width: 100%;
+            text-align: center;
+        }
+
+        .simple-nav-section {
+            margin: 20px 0;
+        }
+
+        .simple-nav-section .btn {
+            margin: 5px;
+            min-width: 180px;
+        }
+    }
+
+    .simple-nav-section {
+        background: white;
+        border-radius: 10px;
+        padding: 30px;
+        margin: 30px 0;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        text-align: center;
+    }
+
+    .simple-nav-section .btn {
+        margin: 0 10px;
+        padding: 12px 24px;
+        font-weight: 600;
+        border-radius: 8px;
+        transition: all 0.3s ease;
+        min-width: 200px;
+    }
+
+    .simple-nav-section .btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+</style>
+
+<div class="dashboard-page">
+    <!-- Welcome Banner -->
+    <div class="welcome-banner" style="display: flex; justify-content: space-between; align-items: center;">
+        <div>
+            <h2>Welcome, <?= Html::encode(Yii::$app->user->identity->username) ?></h2>
+            <p style="font-size: 1rem; margin: 10px 0 0; color: rgba(255,255,255,0.95);">
+                Role: <strong><?= Html::encode(app\components\RbacHelper::getCurrentUserRole() ?: 'Guest') ?></strong>
+            </p>
+            <?php $currentRole = app\components\RbacHelper::getCurrentUserRole(); ?>
+            <?php $roleActions = app\components\RbacHelper::getActionsForRole($currentRole); ?>
+            <p style="font-size: 0.9rem; margin-top: 10px; color: rgba(255,255,255,0.95);">
+                Available actions: <?= Html::encode(implode(', ', $roleActions)) ?>
+            </p>
+        </div>
+        <div>
+            <?php if (Yii::$app->user->identity->role_id == 1): // Supervisor role ?>
+                <?= Html::a(
+                    '<i class="fas fa-user-circle"></i> Supervisor Profile',
+                    ['/supervisor/profile'],
+                    ['class' => 'btn btn-light btn-sm', 'style' => 'font-weight: 600;']
+                ) ?>
+            <?php elseif (Yii::$app->user->identity->role_id == 2): // Zone Coordinator role ?>
+                <?= Html::a(
+                    '<i class="fas fa-user-check"></i> Zone Coordinator Profile',
+                    ['/zone-coordinator/profile'],
+                    ['class' => 'btn btn-light btn-sm', 'style' => 'font-weight: 600;']
+                ) ?>
+            <?php elseif (Yii::$app->user->identity->role_id == 3): // TP Office role ?>
+                <?= Html::a(
+                    '<i class="fas fa-building"></i> TP Office Profile',
+                    ['/tp-office-coordinator/profile'],
+                    ['class' => 'btn btn-light btn-sm', 'style' => 'font-weight: 600;']
+                ) ?>
+            <?php elseif (Yii::$app->user->identity->role_id == 4): // Department Chair role ?>
+                <?= Html::a(
+                    '<i class="fas fa-crown"></i> Department Chair Profile',
+                    ['/department-chair/profile'],
+                    ['class' => 'btn btn-light btn-sm', 'style' => 'font-weight: 600;']
+                ) ?>
+            <?php endif; ?>
+        </div>
+    </div>
+
+    <!-- SYSTEMATIC DASHBOARD STYLES -->
+    .systematic-dashboard {
+        max-width: 1200px;
+        margin: 0 auto;
+    }
+
+    .dashboard-section {
+        margin-bottom: 40px;
+        background: white;
+        border-radius: 12px;
+        padding: 30px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+        border: 1px solid #e9ecef;
+    }
+
+    .section-title {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: #2c3e50;
+        margin-bottom: 25px;
+        padding-bottom: 15px;
+        border-bottom: 3px solid #3498db;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .section-title i {
+        color: #3498db;
+    }
+
+    /* Statistics Grid */
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 20px;
+    }
+
+    .stat-item {
+        text-align: center;
+        padding: 25px;
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        border-radius: 10px;
+        border-left: 4px solid #3498db;
+        transition: transform 0.3s ease;
+    }
+
+    .stat-item:hover {
+        transform: translateY(-5px);
+    }
+
+    .stat-value {
+        font-size: 2.5rem;
+        font-weight: 800;
+        color: #3498db;
+        margin-bottom: 8px;
+    }
+
+    .stat-label {
+        color: #6c757d;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        font-size: 0.9rem;
+    }
+
+    /* Actions Grid */
+    .actions-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 20px;
+    }
+
+    .action-card {
+        display: flex;
+        align-items: center;
+        padding: 20px;
+        background: #f8f9fa;
+        border-radius: 10px;
+        border-left: 4px solid #28a745;
+        transition: all 0.3s ease;
+    }
+
+    .action-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+
+    .action-icon {
+        font-size: 2rem;
+        color: #28a745;
+        margin-right: 20px;
+        width: 50px;
+        text-align: center;
+    }
+
+    .action-content h4 {
+        margin: 0 0 5px 0;
+        font-weight: 600;
+        color: #2c3e50;
+    }
+
+    .action-content p {
+        margin: 0 0 15px 0;
+        color: #6c757d;
+        font-size: 0.9rem;
+    }
+
+    /* Workflow Status */
+    .workflow-status {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 20px;
+    }
+
+    .workflow-step {
+        background: #f8f9fa;
+        border-radius: 10px;
+        padding: 20px;
+        border-left: 4px solid #17a2b8;
+        transition: all 0.3s ease;
+    }
+
+    .workflow-step:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+
+    .step-header {
+        display: flex;
+        align-items: center;
+        margin-bottom: 15px;
+    }
+
+    .step-number {
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        background: #17a2b8;
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        margin-right: 15px;
+        font-size: 0.9rem;
+    }
+
+    .step-header h4 {
+        margin: 0;
+        color: #2c3e50;
+        font-weight: 600;
+    }
+
+    .step-count {
+        font-size: 2rem;
+        font-weight: 800;
+        color: #17a2b8;
+        margin-bottom: 5px;
+    }
+
+    .workflow-step p {
+        color: #6c757d;
+        margin: 0 0 15px 0;
+        font-size: 0.9rem;
+    }
+
+    /* Modules Grid */
+    .modules-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 20px;
+    }
+
+    .module-item {
+        background: #f8f9fa;
+        border-radius: 10px;
+        padding: 25px;
+        text-align: center;
+        border: 1px solid #e9ecef;
+        transition: all 0.3s ease;
+    }
+
+    .module-item:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+
+    .module-item i {
+        font-size: 2.5rem;
+        color: #6c757d;
+        margin-bottom: 15px;
+        display: block;
+    }
+
+    .module-item h5 {
+        margin: 0 0 10px 0;
+        color: #2c3e50;
+        font-weight: 600;
+    }
+
+    .module-item p {
+        color: #6c757d;
+        margin: 0 0 20px 0;
+        font-size: 0.9rem;
+    }
+
+    .module-actions {
+        display: flex;
+        gap: 10px;
+        justify-content: center;
+    }
+
+    .module-actions .btn {
+        flex: 1;
+    }
+
+    /* Responsive Design */
+    @media (max-width: 768px) {
+        .systematic-dashboard {
+            padding: 0 15px;
+        }
+
+        .dashboard-section {
+            padding: 20px;
+        }
+
+        .stats-grid,
+        .actions-grid,
+        .workflow-status,
+        .modules-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .action-card,
+        .workflow-step {
+            flex-direction: column;
+            text-align: center;
+        }
+
+        .action-icon {
+            margin-right: 0;
+            margin-bottom: 15px;
+        }
+
+        .step-header {
+            justify-content: center;
+        }
+
+        .module-actions {
+            flex-direction: column;
+        }
+
+        .module-actions .btn {
+            margin-bottom: 5px;
+        }
+    }
+</style>
+
+<div class="dashboard-page">
+    <!-- Welcome Banner -->
+    <div class="welcome-banner" style="display: flex; justify-content: space-between; align-items: center;">
+        <div>
+            <h2>Welcome, <?= Html::encode(Yii::$app->user->identity->username) ?></h2>
+            <p style="font-size: 1rem; margin: 10px 0 0; color: rgba(255,255,255,0.95);">
+                Role: <strong><?= Html::encode(app\components\RbacHelper::getCurrentUserRole() ?: 'Guest') ?></strong>
+            </p>
+            <?php $currentRole = app\components\RbacHelper::getCurrentUserRole(); ?>
+            <?php $roleActions = app\components\RbacHelper::getActionsForRole($currentRole); ?>
+            <p style="font-size: 0.9rem; margin-top: 10px; color: rgba(255,255,255,0.95);">
+                Available actions: <?= Html::encode(implode(', ', $roleActions)) ?>
+            </p>
+        </div>
+        <div>
+            <?php if (Yii::$app->user->identity->role_id == 1): // Supervisor role ?>
+                <?= Html::a(
+                    '<i class="fas fa-user-circle"></i> Supervisor Profile',
+                    ['/supervisor/profile'],
+                    ['class' => 'btn btn-light btn-sm', 'style' => 'font-weight: 600;']
+                ) ?>
+            <?php elseif (Yii::$app->user->identity->role_id == 2): // Zone Coordinator role ?>
+                <?= Html::a(
+                    '<i class="fas fa-user-check"></i> Zone Coordinator Profile',
+                    ['/zone-coordinator/profile'],
+                    ['class' => 'btn btn-light btn-sm', 'style' => 'font-weight: 600;']
+                ) ?>
+            <?php elseif (Yii::$app->user->identity->role_id == 3): // TP Office role ?>
+                <?= Html::a(
+                    '<i class="fas fa-building"></i> TP Office Profile',
+                    ['/tp-office-coordinator/profile'],
+                    ['class' => 'btn btn-light btn-sm', 'style' => 'font-weight: 600;']
+                ) ?>
+            <?php elseif (Yii::$app->user->identity->role_id == 4): // Department Chair role ?>
+                <?= Html::a(
+                    '<i class="fas fa-crown"></i> Department Chair Profile',
+                    ['/department-chair/profile'],
+                    ['class' => 'btn btn-light btn-sm', 'style' => 'font-weight: 600;']
+                ) ?>
+            <?php endif; ?>
+        </div>
+    </div>
+
+    <!-- SYSTEMATIC DASHBOARD LAYOUT -->
+    <div class="systematic-dashboard">
+        <!-- 1. OVERVIEW STATISTICS -->
+        <div class="dashboard-section">
+            <h3 class="section-title"><i class="fas fa-chart-bar"></i> System Overview</h3>
+            <div class="stats-grid">
+                <?php
+                $totalAssessments = Assessment::find()->andWhere(['or', ['archived' => 0], ['archived' => null]])->count();
+                $pendingValidation = Assessment::find()->andWhere(['or', ['archived' => 0], ['archived' => null]])->andWhere(['is', 'overall_level', null])->count();
+                $validatedAssessments = Assessment::find()->andWhere(['is not', 'validated_by', null])->count();
+                $schoolCount = Assessment::find()->select(['school_id'])->distinct()->count('DISTINCT school_id');
+                ?>
+                <div class="stat-item">
+                    <div class="stat-value"><?= $totalAssessments ?></div>
+                    <div class="stat-label">Total Assessments</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value"><?= $pendingValidation ?></div>
+                    <div class="stat-label">Pending Validation</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value"><?= $validatedAssessments ?></div>
+                    <div class="stat-label">Validated</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value"><?= $schoolCount ?></div>
+                    <div class="stat-label">Schools</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. QUICK ACTIONS -->
+        <div class="dashboard-section">
+            <h3 class="section-title"><i class="fas fa-bolt"></i> Quick Actions</h3>
+            <div class="actions-grid">
+                <?php if (RbacHelper::isSupervisor()): ?>
+                    <div class="action-card">
+                        <div class="action-icon"><i class="fas fa-plus-circle"></i></div>
+                        <div class="action-content">
+                            <h4>Create Assessment</h4>
+                            <p>Start a new assessment report</p>
+                            <?= Html::a('Create Now', ['/assessment/create'], ['class' => 'btn btn-primary btn-sm']) ?>
+                        </div>
+                    </div>
+                    <div class="action-card">
+                        <div class="action-icon"><i class="fas fa-list"></i></div>
+                        <div class="action-content">
+                            <h4>My Assessments</h4>
+                            <p>View and manage your assessments</p>
+                            <?= Html::a('View All', ['/assessment/index'], ['class' => 'btn btn-outline-primary btn-sm']) ?>
+                        </div>
+                    </div>
+                <?php elseif (RbacHelper::isZoneCoordinator()): ?>
+                    <div class="action-card">
+                        <div class="action-icon"><i class="fas fa-check-double"></i></div>
+                        <div class="action-content">
+                            <h4>Validate All</h4>
+                            <p>Bulk validate pending assessments</p>
+                            <?= Html::a('Validate Now', ['/zone-coordinator/validate-all'], ['class' => 'btn btn-success btn-sm', 'data-method' => 'post', 'data-confirm' => 'Validate all pending assessments now?']) ?>
+                        </div>
+                    </div>
+                    <div class="action-card">
+                        <div class="action-icon"><i class="fas fa-search"></i></div>
+                        <div class="action-content">
+                            <h4>Review Assessments</h4>
+                            <p>Review and manage all assessments</p>
+                            <?= Html::a('Review Now', ['/assessment/index'], ['class' => 'btn btn-primary btn-sm']) ?>
+                        </div>
+                    </div>
+                <?php endif; ?>
+            </div>
+        </div>
+
+        <!-- 3. WORKFLOW STATUS (Zone Coordinators Only) -->
+        <?php if (RbacHelper::isZoneCoordinator()): ?>
+        <div class="dashboard-section">
+            <h3 class="section-title"><i class="fas fa-tasks"></i> Assessment Workflow</h3>
+            <div class="workflow-status">
+                <div class="workflow-step">
+                    <div class="step-header">
+                        <span class="step-number">1</span>
+                        <h4>Pending Reviews</h4>
+                    </div>
+                    <div class="step-content">
+                        <?php
+                        $pendingReviews = Assessment::find()
+                            ->andWhere(['archived' => 1])
+                            ->andWhere(['is', 'validated_by', null])
+                            ->count();
+                        ?>
+                        <div class="step-count"><?= $pendingReviews ?></div>
+                        <p>Assessments awaiting review</p>
+                        <?php if ($pendingReviews > 0): ?>
+                            <?= Html::a('Review Now', ['/assessment/index'], ['class' => 'btn btn-primary btn-sm']) ?>
+                        <?php endif; ?>
+                    </div>
+                </div>
+                <div class="workflow-step">
+                    <div class="step-header">
+                        <span class="step-number">2</span>
+                        <h4>Ready for Validation</h4>
+                    </div>
+                    <div class="step-content">
+                        <?php
+                        $readyForValidation = Assessment::find()
+                            ->andWhere(['archived' => 1])
+                            ->andWhere(['is', 'validated_by', null])
+                            ->andWhere(['is not', 'overall_level', null])
+                            ->count();
+                        ?>
+                        <div class="step-count"><?= $readyForValidation ?></div>
+                        <p>Completed assessments ready to validate</p>
+                        <?php if ($readyForValidation > 0): ?>
+                            <?= Html::a('Validate Now', ['/zone-coordinator/validate-all'], ['class' => 'btn btn-success btn-sm', 'data-method' => 'post', 'data-confirm' => 'Validate all ready assessments now?']) ?>
+                        <?php endif; ?>
+                    </div>
+                </div>
+                <div class="workflow-step">
+                    <div class="step-header">
+                        <span class="step-number">3</span>
+                        <h4>Validated</h4>
+                    </div>
+                    <div class="step-content">
+                        <div class="step-count"><?= $validatedAssessments ?></div>
+                        <p>Successfully validated assessments</p>
+                        <?= Html::a('View History', ['/assessment/index', 'AssessmentSearch' => ['validated_by' => 'not null']], ['class' => 'btn btn-outline-success btn-sm']) ?>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <?php endif; ?>
+
+        <!-- 4. SYSTEM MODULES -->
+        <div class="dashboard-section">
+            <h3 class="section-title"><i class="fas fa-cubes"></i> System Modules</h3>
+            <div class="modules-grid">
+                <?php if (RbacHelper::isSupervisor()): ?>
+                    <div class="module-item">
+                        <i class="fas fa-file-alt"></i>
+                        <h5>Assessments</h5>
+                        <p>Create and manage assessments</p>
+                        <div class="module-actions">
+                            <?= Html::a('View', ['/assessment/index'], ['class' => 'btn btn-sm btn-outline-primary']) ?>
+                            <?= Html::a('Create', ['/assessment/create'], ['class' => 'btn btn-sm btn-primary']) ?>
+                        </div>
+                    </div>
+                <?php endif; ?>
+
+                <?php if (RbacHelper::isTpOffice()): ?>
+                    <div class="module-item">
+                        <i class="fas fa-school"></i>
+                        <h5>Schools</h5>
+                        <p>Manage school information</p>
+                        <div class="module-actions">
+                            <?= Html::a('View', ['/school/index'], ['class' => 'btn btn-sm btn-outline-primary']) ?>
+                            <?= Html::a('Create', ['/school/create'], ['class' => 'btn btn-sm btn-primary']) ?>
+                        </div>
+                    </div>
+                    <div class="module-item">
+                        <i class="fas fa-graduation-cap"></i>
+                        <h5>Grades</h5>
+                        <p>Manage grade levels</p>
+                        <div class="module-actions">
+                            <?= Html::a('View', ['/grade/index'], ['class' => 'btn btn-sm btn-outline-primary']) ?>
+                            <?= Html::a('Create', ['/grade/create'], ['class' => 'btn btn-sm btn-primary']) ?>
+                        </div>
+                    </div>
+                    <div class="module-item">
+                        <i class="fas fa-book"></i>
+                        <h5>Learning Areas</h5>
+                        <p>Manage subject areas</p>
+                        <div class="module-actions">
+                            <?= Html::a('View', ['/learning-area/index'], ['class' => 'btn btn-sm btn-outline-primary']) ?>
+                            <?= Html::a('Create', ['/learning-area/create'], ['class' => 'btn btn-sm btn-primary']) ?>
+                        </div>
+                    </div>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+</div>
+
+    <!-- Zone Coordinator Systematic Workflow (First Thing They See) -->
+    <?php if (Yii::$app->user->identity->role_id == 2): // Zone Coordinator ?>
+        <style>
+            .workflow-steps .step-box {
+                padding: 20px;
+                margin: 10px 0;
+                border-radius: 8px;
+                background: #f8f9fa;
+                border: 2px solid #dee2e6;
+                transition: all 0.3s ease;
+            }
+
+            .workflow-steps .step-box.active {
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+                border-color: #667eea;
+                transform: translateY(-2px);
+                box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+            }
+
+            .workflow-steps .step-number {
+                width: 40px;
+                height: 40px;
+                border-radius: 50%;
+                background: #fff;
+                color: #333;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-weight: bold;
+                font-size: 18px;
+                margin: 0 auto 10px;
+                border: 2px solid #dee2e6;
+            }
+
+            .workflow-steps .step-box.active .step-number {
+                background: #667eea;
+                color: white;
+                border-color: #667eea;
+            }
+
+            .workflow-steps h6 {
+                margin-bottom: 8px;
+                font-weight: 600;
+            }
+
+            .border-left-primary {
+                border-left: 4px solid #007bff !important;
+            }
+
+            .border-left-warning {
+                border-left: 4px solid #ffc107 !important;
+            }
+
+            .border-left-success {
+                border-left: 4px solid #28a745 !important;
+            }
+        </style>
+
+        <!-- Systematic 3-Step Assessment Workflow -->
+        <div class="row mb-4">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0"><i class="fas fa-tasks"></i> Assessment Management System</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="workflow-steps mb-4">
+                            <div class="row text-center">
+                                <div class="col-md-4">
+                                    <div class="step-box step-1 active">
+                                        <div class="step-number">1</div>
+                                        <h6>Pending Reviews</h6>
+                                        <p class="small">Assessments awaiting your review</p>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="step-box step-2">
+                                        <div class="step-number">2</div>
+                                        <h6>Pending Edits</h6>
+                                        <p class="small">Assessments requiring corrections</p>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="step-box step-3">
+                                        <div class="step-number">3</div>
+                                        <h6>Ready for Validation</h6>
+                                        <p class="small">Completed assessments awaiting final approval</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- STEP 1: Review Assessment Reports -->
+        <div class="row mb-4">
+            <div class="col-md-12">
+                <div class="card border-left-primary">
+                    <div class="card-header bg-light">
+                        <h5 class="mb-0"><i class="fas fa-search text-primary"></i> Pending Reviews</h5>
+                        <small class="text-muted">Assessments submitted and awaiting your review</small>
+                    </div>
+                    <div class="card-body">
+                        <?php
+                        $submittedAssessments = \app\models\Assessment::find()
+                            ->andWhere(['archived' => 1])
+                            ->andWhere(['is', 'validated_by', null])
+                            ->orderBy(['assessment_date' => SORT_DESC])
+                            ->limit(10)
+                            ->all();
+                        ?>
+                        <?php if (count($submittedAssessments) > 0): ?>
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Student</th>
+                                            <th>School</th>
+                                            <th>Date Submitted</th>
+                                            <th>Examiner</th>
+                                            <th>Status</th>
+                                            <th>Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php foreach ($submittedAssessments as $assessment): ?>
+                                            <tr>
+                                                <td><strong><?= Html::encode($assessment->student_reg_no) ?></strong></td>
+                                                <td><?= Html::encode($assessment->school ? $assessment->school->school_name : 'N/A') ?></td>
+                                                <td><?= Html::encode($assessment->assessment_date) ?></td>
+                                                <td><?= Html::encode($assessment->examinerUser ? $assessment->examinerUser->name : 'N/A') ?></td>
+                                                <td>
+                                                    <?php if ($assessment->overall_level): ?>
+                                                        <span class="badge badge-info">Complete</span>
+                                                    <?php else: ?>
+                                                        <span class="badge badge-warning">Incomplete</span>
+                                                    <?php endif; ?>
+                                                </td>
+                                                <td>
+                                                    <?= Html::a('<i class="fas fa-eye"></i> Review', ['/zone-coordinator/review-assessment', 'assessment_id' => $assessment->assessment_id], ['class' => 'btn btn-primary']) ?>
+                                                </td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                        <?php else: ?>
+                            <div class="text-center text-muted py-3">
+                                <i class="fas fa-check-circle fa-2x text-success mb-2"></i>
+                                <p>No assessments currently need review.</p>
+                            </div>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- STEP 2: Edit Assessment Reports -->
+        <div class="row mb-4">
+            <div class="col-md-12">
+                <div class="card border-left-warning">
+                    <div class="card-header bg-light">
+                        <h5 class="mb-0"><i class="fas fa-edit text-warning"></i> Pending Edits</h5>
+                        <small class="text-muted">Assessments that require corrections or updates</small>
+                    </div>
+                    <div class="card-body">
+                        <?php if (count($submittedAssessments) > 0): ?>
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Student</th>
+                                            <th>School</th>
+                                            <th>Date Submitted</th>
+                                            <th>Examiner</th>
+                                            <th>Status</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php foreach ($submittedAssessments as $assessment): ?>
+                                            <tr>
+                                                <td><strong><?= Html::encode($assessment->student_reg_no) ?></strong></td>
+                                                <td><?= Html::encode($assessment->school ? $assessment->school->school_name : 'N/A') ?></td>
+                                                <td><?= Html::encode($assessment->assessment_date) ?></td>
+                                                <td><?= Html::encode($assessment->examinerUser ? $assessment->examinerUser->name : 'N/A') ?></td>
+                                                <td>
+                                                    <?php if ($assessment->overall_level): ?>
+                                                        <span class="badge badge-info">Complete</span>
+                                                    <?php else: ?>
+                                                        <span class="badge badge-warning">Incomplete</span>
+                                                    <?php endif; ?>
+                                                </td>
+                                                <td>
+                                                    <div class="btn-group btn-group-sm">
+                                                        <?= Html::a('<i class="fas fa-eye"></i> Review', ['/zone-coordinator/review-assessment', 'assessment_id' => $assessment->assessment_id], ['class' => 'btn btn-info me-1']) ?>
+                                                        <?= Html::a('<i class="fas fa-edit"></i> Edit', ['/zone-coordinator/edit-assessment', 'assessment_id' => $assessment->assessment_id], ['class' => 'btn btn-warning']) ?>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                        <?php else: ?>
+                            <div class="text-center text-muted py-3">
+                                <i class="fas fa-edit fa-2x text-muted mb-2"></i>
+                                <p>No assessments currently available for editing.</p>
+                            </div>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- STEP 3: Validate Assessment Reports -->
+        <div class="row mb-4">
+            <div class="col-md-12">
+                <div class="card border-left-success">
+                    <div class="card-header bg-light">
+                        <h5 class="mb-0"><i class="fas fa-check-circle text-success"></i> Ready for Validation</h5>
+                        <small class="text-muted">Completed assessments awaiting final approval</small>
+                    </div>
+                    <div class="card-body">
+                        <?php
+                        $completeAssessments = array_filter($submittedAssessments, function($assessment) {
+                            return $assessment->overall_level !== null && $assessment->validated_by === null;
+                        });
+                        ?>
+                        <?php if (count($completeAssessments) > 0): ?>
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Student</th>
+                                            <th>School</th>
+                                            <th>Date Submitted</th>
+                                            <th>Examiner</th>
+                                            <th>Score</th>
+                                            <th>Level</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php foreach ($completeAssessments as $assessment): ?>
+                                            <tr>
+                                                <td><strong><?= Html::encode($assessment->student_reg_no) ?></strong></td>
+                                                <td><?= Html::encode($assessment->school ? $assessment->school->school_name : 'N/A') ?></td>
+                                                <td><?= Html::encode($assessment->assessment_date) ?></td>
+                                                <td><?= Html::encode($assessment->examinerUser ? $assessment->examinerUser->name : 'N/A') ?></td>
+                                                <td><strong><?= $assessment->total_score ?>/100</strong></td>
+                                                <td>
+                                                    <?php
+                                                    $badges = [
+                                                        'BE' => '<span class="badge bg-danger">BE</span>',
+                                                        'AE' => '<span class="badge bg-warning text-dark">AE</span>',
+                                                        'ME' => '<span class="badge bg-info">ME</span>',
+                                                        'EE' => '<span class="badge bg-success">EE</span>'
+                                                    ];
+                                                    echo $badges[$assessment->overall_level] ?? '<span class="badge bg-secondary">N/A</span>';
+                                                    ?>
+                                                </td>
+                                                <td>
+                                                    <div class="btn-group btn-group-sm">
+                                                        <?= Html::a('<i class="fas fa-eye"></i> Review', ['/zone-coordinator/review-assessment', 'assessment_id' => $assessment->assessment_id], ['class' => 'btn btn-info me-1']) ?>
+                                                        <?= Html::a('<i class="fas fa-edit"></i> Edit', ['/zone-coordinator/edit-assessment', 'assessment_id' => $assessment->assessment_id], ['class' => 'btn btn-warning me-1']) ?>
+                                                        <?= Html::a('<i class="fas fa-check-circle"></i> Validate', ['/zone-coordinator/validate-assessment', 'assessment_id' => $assessment->assessment_id], ['class' => 'btn btn-success']) ?>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                        <?php else: ?>
+                            <div class="text-center text-muted py-3">
+                                <i class="fas fa-clock fa-2x text-muted mb-2"></i>
+                                <p>No completed assessments ready for validation yet.</p>
+                                <small class="text-muted">Assessments must be fully graded before they can be validated.</small>
+                            </div>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Access Links -->
+        <div class="row">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-header bg-light">
+                        <h5 class="mb-0"><i class="fas fa-link"></i> Quick Access</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <?= Html::a('<i class="fas fa-list"></i> View All Assessments', ['/assessment/index'], ['class' => 'btn btn-outline-primary btn-lg w-100 mb-2']) ?>
+                            </div>
+                            <div class="col-md-6">
+                                <?= Html::a('<i class="fas fa-user-check"></i> My Profile', ['/zone-coordinator/profile'], ['class' => 'btn btn-outline-secondary btn-lg w-100 mb-2']) ?>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Validated Assessments -->
+        <div class="row mb-4">
+            <div class="col-md-12">
+                <div class="card border-left-success">
+                    <div class="card-header bg-light">
+                        <h5 class="mb-0"><i class="fas fa-check-double text-success"></i> Validated Assessments</h5>
+                        <small class="text-muted">Assessments that have been reviewed and validated</small>
+                    </div>
+                    <div class="card-body">
+                        <?php
+                        $validatedAssessments = array_filter($submittedAssessments, function($assessment) {
+                            return $assessment->validated_by !== null;
+                        });
+                        ?>
+                        <?php if (count($validatedAssessments) > 0): ?>
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Student</th>
+                                            <th>School</th>
+                                            <th>Date Submitted</th>
+                                            <th>Examiner</th>
+                                            <th>Score</th>
+                                            <th>Level</th>
+                                            <th>Validated By</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php foreach ($validatedAssessments as $assessment): ?>
+                                            <tr class="table-success">
+                                                <td><strong><?= Html::encode($assessment->student_reg_no) ?></strong></td>
+                                                <td><?= Html::encode($assessment->school ? $assessment->school->school_name : 'N/A') ?></td>
+                                                <td><?= Html::encode($assessment->assessment_date) ?></td>
+                                                <td><?= Html::encode($assessment->examinerUser ? $assessment->examinerUser->name : 'N/A') ?></td>
+                                                <td><strong><?= $assessment->total_score ?>/100</strong></td>
+                                                <td>
+                                                    <?php
+                                                    $badges = [
+                                                        'BE' => '<span class="badge bg-danger">BE</span>',
+                                                        'AE' => '<span class="badge bg-warning text-dark">AE</span>',
+                                                        'ME' => '<span class="badge bg-info">ME</span>',
+                                                        'EE' => '<span class="badge bg-success">EE</span>'
+                                                    ];
+                                                    echo $badges[$assessment->overall_level] ?? '<span class="badge bg-secondary">N/A</span>';
+                                                    ?>
+                                                </td>
+                                                <td>
+                                                    <span class="badge bg-success">
+                                                        <i class="fas fa-user-check"></i> <?= Html::encode($assessment->validatorUser ? $assessment->validatorUser->name : 'Unknown') ?>
+                                                    </span>
+                                                </td>
+                                                <td>
+                                                    <?= Html::a('<i class="fas fa-eye"></i> Review', ['/zone-coordinator/review-assessment', 'assessment_id' => $assessment->assessment_id], ['class' => 'btn btn-sm btn-info']) ?>
+                                                </td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                        <?php else: ?>
+                            <div class="text-center text-muted py-3">
+                                <i class="fas fa-check-circle fa-2x text-success mb-2"></i>
+                                <p>No validated assessments yet.</p>
+                                <small class="text-muted">Validated assessments will appear here once they are approved.</small>
+                            </div>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    <?php endif; ?>
+
+    <!-- Statistics Cards -->
+    <?php if (Yii::$app->user->identity->role_id == 1): ?>
+        <div class="alert alert-info mb-3" role="alert">
+            <i class="fas fa-info-circle"></i> 
+            <strong>Supervisor View:</strong> Statistics below show only YOUR assessments and activities.
+        </div>
+    <?php endif; ?>
+    <div class="row">
+        <div class="col-md-6 col-lg-3">
+            <div class="stat-card">
+                <div class="stat-number"><?= $stats['totalAssessments'] ?></div>
+                <div class="stat-label">Assessments</div>
+            </div>
+        </div>
+        <div class="col-md-6 col-lg-3">
+            <div class="stat-card">
+                <div class="stat-number"><?= $stats['totalSchools'] ?></div>
+                <div class="stat-label">Schools</div>
+            </div>
+        </div>
+        <div class="col-md-6 col-lg-3">
+            <div class="stat-card">
+                <div class="stat-number"><?= $stats['totalGrades'] ?></div>
+                <div class="stat-label">Grades</div>
+            </div>
+        </div>
+        <div class="col-md-6 col-lg-3">
+            <div class="stat-card">
+                <div class="stat-number"><?= $stats['totalLearningAreas'] ?></div>
+                <div class="stat-label">Learning Areas</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Access Modules - Role Based -->
+    <div class="module-section">
+        <h2>Quick Access</h2>
+
+        <!-- TP OFFICE/ADMIN - Users Management -->
+        <?php if (RbacHelper::isTpOffice() || RbacHelper::isAdmin()): ?>
+            <div class="module-card">
+                <div style="display: flex; align-items: center; flex: 1;">
+                    <div class="module-info">
+                        <h3>Users</h3>
+                        <p>Manage student and lecturer details</p>
+                    </div>
+                </div>
+                <div class="module-action">
+                    <?= Html::a('View', ['/users/index'], ['class' => 'btn-module']) ?>
+                    <?= Html::a('Create', ['/users/create'], ['class' => 'btn-module']) ?>
+                </div>
+            </div>
+        <?php endif; ?>
+
+        <!-- TP OFFICE/ADMIN - Configuration Modules -->
+        <?php if (RbacHelper::isTpOffice() || RbacHelper::isAdmin()): ?>
+            <div class="module-card">
+                <div style="display: flex; align-items: center; flex: 1;">
+                    <div class="module-info">
+                        <h3>Schools</h3>
+                        <p>Manage schools and zones</p>
+                    </div>
+                </div>
+                <div class="module-action">
+                    <?= Html::a('View', ['/school/index'], ['class' => 'btn-module']) ?>
+                    <?= Html::a('Create', ['/school/create'], ['class' => 'btn-module']) ?>
+                </div>
+            </div>
+
+            <div class="module-card">
+                <div style="display: flex; align-items: center; flex: 1;">
+                    <div class="module-info">
+                        <h3>Grades/Forms</h3>
+                        <p>Manage grade levels and classifications</p>
+                    </div>
+                </div>
+                <div class="module-action">
+                    <?= Html::a('View', ['/grade/index'], ['class' => 'btn-module']) ?>
+                    <?= Html::a('Create', ['/grade/create'], ['class' => 'btn-module']) ?>
+                </div>
+            </div>
+
+            <div class="module-card">
+                <div style="display: flex; align-items: center; flex: 1;">
+                    <div class="module-info">
+                        <h3>Learning Areas</h3>
+                        <p>Define subjects and learning areas</p>
+                    </div>
+                </div>
+                <div class="module-action">
+                    <?= Html::a('View', ['/learning-area/index'], ['class' => 'btn-module']) ?>
+                    <?= Html::a('Create', ['/learning-area/create'], ['class' => 'btn-module']) ?>
+                </div>
+            </div>
+
+            <div class="module-card">
+                <div style="display: flex; align-items: center; flex: 1;">
+                    <div class="module-info">
+                        <h3>Competence Areas</h3>
+                        <p>Manage 12 teaching competence standards</p>
+                    </div>
+                </div>
+                <div class="module-action">
+                    <?= Html::a('View', ['/competence-area/index'], ['class' => 'btn-module']) ?>
+                    <?= Html::a('Create', ['/competence-area/create'], ['class' => 'btn-module']) ?>
+                </div>
+            </div>
+
+            <div class="module-card">
+                <div style="display: flex; align-items: center; flex: 1;">
+                    <div class="module-info">
+                        <h3>Strands</h3>
+                        <p>Manage strands within learning areas</p>
+                    </div>
+                </div>
+                <div class="module-action">
+                    <?= Html::a('View', ['/strand/index'], ['class' => 'btn-module']) ?>
+                    <?= Html::a('Create', ['/strand/create'], ['class' => 'btn-module']) ?>
+                </div>
+            </div>
+
+            <div class="module-card">
+                <div style="display: flex; align-items: center; flex: 1;">
+                    <div class="module-info">
+                        <h3>Substrands</h3>
+                        <p>Define detailed evaluation criteria</p>
+                    </div>
+                </div>
+                <div class="module-action">
+                    <?= Html::a('View', ['/substrand/index'], ['class' => 'btn-module']) ?>
+                    <?= Html::a('Create', ['/substrand/create'], ['class' => 'btn-module']) ?>
+                </div>
+            </div>
+        <?php endif; ?>
+
+        <!-- SUPERVISOR - Assessment Module Only -->
+        <?php if (RbacHelper::isSupervisor()): ?>
+            <div class="module-card">
+                <div style="display: flex; align-items: center; flex: 1;">
+                    <div class="module-info">
+                        <h3>Assessments</h3>
+                        <p>Create and manage assessments for students</p>
+                    </div>
+                </div>
+                <div class="module-action">
+                    <?= Html::a('View', ['/assessment/index'], ['class' => 'btn-module']) ?>
+                    <?= Html::a('Create', ['/assessment/create'], ['class' => 'btn-module']) ?>
+                </div>
+            </div>
+        <?php endif; ?>
+
+        <!-- ZONE COORDINATOR - Simple Navigation -->
+        <?php if (RbacHelper::isZoneCoordinator()): ?>
+            <div class="simple-nav-section">
+                <div class="d-flex justify-content-center align-items-center gap-3">
+                    <?= Html::a('<i class="fas fa-check-double"></i> Validate All', ['/zone-coordinator/validate-all'], [
+                        'class' => 'btn btn-success btn-lg',
+                        'data-method' => 'post',
+                        'data-confirm' => 'Validate all pending assessments now?',
+                        'title' => 'Validate all pending assessments at once'
+                    ]) ?>
+                    <?= Html::a('<i class="fas fa-list"></i> View All Assessments', ['/assessment/index'], [
+                        'class' => 'btn btn-primary btn-lg',
+                        'title' => 'Review and manage all assessments'
+                    ]) ?>
+                    <?= Html::a('<i class="fas fa-user-cog"></i> My Profile', ['/zone-coordinator/profile'], [
+                        'class' => 'btn btn-outline-secondary btn-lg',
+                        'title' => 'Access zone coordinator profile and workflow'
+                    ]) ?>
+                </div>
+            </div>
+        <?php endif; ?>
+
+        <!-- DEPARTMENT CHAIR - View Reports -->
+        <?php if (RbacHelper::isDepartmentChair()): ?>
+            <div class="module-card">
+                <div style="display: flex; align-items: center; flex: 1;">
+                    <div class="module-info">
+                        <h3>Assessment Reports</h3>
+                        <p>Monitor TP assessments and system reports</p>
+                    </div>
+                </div>
+                <div class="module-action">
+                    <?= Html::a('View', ['/assessment/index'], ['class' => 'btn-module']) ?>
+                </div>
+            </div>
+        <?php endif; ?>
+
+    </div>
+
+</div>
