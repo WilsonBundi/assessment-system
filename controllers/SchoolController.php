@@ -28,9 +28,20 @@ class SchoolController extends Controller
                     'class' => AccessControl::className(),
                     'rules' => [
                         [
+                            'actions' => ['index', 'view'],
                             'allow' => true,
                             'roles' => ['@'],
                             'matchCallback' => function ($rule, $action) {
+                                // Allow TP Office and Zone Coordinators to view schools
+                                return RbacHelper::isTpOffice() || RbacHelper::isZoneCoordinator();
+                            },
+                        ],
+                        [
+                            'actions' => ['create', 'update', 'delete'],
+                            'allow' => true,
+                            'roles' => ['@'],
+                            'matchCallback' => function ($rule, $action) {
+                                // Only TP Office can create, update, delete schools
                                 return RbacHelper::isTpOffice();
                             },
                         ],
@@ -73,13 +84,29 @@ class SchoolController extends Controller
     {
         // Handle both parameter names
         $school_id = $school_id ?? $id ?? Yii::$app->request->get('school_id') ?? Yii::$app->request->get('id');
-        
+
         if (!$school_id) {
             throw new NotFoundHttpException('School ID is required.');
         }
-        
+
+        $model = $this->findModel($school_id);
+
+        // Zone coordinators can only view schools in zones they're assigned to
+        if (RbacHelper::isZoneCoordinator()) {
+            $user = Yii::$app->user->identity;
+            $isAssigned = \app\models\School::find()
+                ->innerJoin('zone', 'zone.zone_id = school.zone_id')
+                ->innerJoin('users', 'users.zone_id = zone.zone_id AND users.role_id = 2 AND users.user_id = :userId', [':userId' => $user->user_id])
+                ->andWhere(['school.school_id' => $school_id])
+                ->exists();
+
+            if (!$isAssigned) {
+                throw new \yii\web\ForbiddenHttpException('You can only view schools in zones assigned to you.');
+            }
+        }
+
         return $this->render('view', [
-            'model' => $this->findModel($school_id),
+            'model' => $model,
         ]);
     }
 

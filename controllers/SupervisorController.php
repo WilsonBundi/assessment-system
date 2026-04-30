@@ -125,9 +125,8 @@ class SupervisorController extends Controller
         $searchModel = new AssessmentSearch();
         $dataProvider = $searchModel->search(Yii::$app->request->queryParams);
         
-        // Get the query object from the data provider and add supervisor filter
-        $dataProvider->query->andWhere(['examiner_user_id' => $user->user_id])
-                            ->andWhere(['or', ['archived' => 0], ['archived' => null]]);
+        // Get the query object from the data provider and scope to this supervisor
+        $dataProvider->query->andWhere(['examiner_user_id' => $user->user_id]);
         
         // Order by date descending and limit to recent
         $dataProvider->query->orderBy(['assessment_date' => SORT_DESC])

@@ -106,8 +106,8 @@ $supervisorOptions = ArrayHelper::map($supervisors, 'user_id', function($user) {
                                                                 <input type="hidden" name="student_reg_no" value="<?= Html::encode($student->student_reg_no) ?>">
                                                                 <div class="input-group input-group-sm">
                                                                     <?= Html::dropDownList('supervisor_user_id', null, $supervisorOptions, [
-                                                                        'class' => 'form-select',
-                                                                        'prompt' => 'Select supervisor'
+                                                                        'class' => 'form-select searchable-select',
+                                                                        'data-placeholder' => 'Select supervisor'
                                                                     ]) ?>
                                                                     <button type="submit" class="btn btn-primary">Assign</button>
                                                                 </div>

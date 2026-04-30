@@ -1,6 +1,8 @@
 <?php
 
 use app\models\Assessment;
+use app\models\SchoolClass;
+use yii\helpers\ArrayHelper;
 use yii\helpers\Html;
 use yii\helpers\Url;
 use yii\grid\ActionColumn;
@@ -50,6 +52,14 @@ $this->params['breadcrumbs'][] = $this->title;
                 'value' => function($model) {
                     return $model->school ? $model->school->school_name : 'N/A';
                 }
+            ],
+            [
+                'attribute' => 'class_id',
+                'label' => 'Class',
+                'value' => function($model) {
+                    return $model->schoolClass ? $model->schoolClass->class_name : 'N/A';
+                },
+                'filter' => ArrayHelper::map(SchoolClass::find()->orderBy(['class_name' => SORT_ASC])->all(), 'class_id', 'class_name')
             ],
             [
                 'attribute' => 'total_score',

@@ -28,9 +28,20 @@ class ZoneController extends Controller
                     'class' => AccessControl::className(),
                     'rules' => [
                         [
+                            'actions' => ['index', 'view'],
                             'allow' => true,
                             'roles' => ['@'],
                             'matchCallback' => function ($rule, $action) {
+                                // Allow TP Office and Zone Coordinators to view zones
+                                return RbacHelper::isTpOffice() || RbacHelper::isZoneCoordinator();
+                            },
+                        ],
+                        [
+                            'actions' => ['create', 'update', 'delete'],
+                            'allow' => true,
+                            'roles' => ['@'],
+                            'matchCallback' => function ($rule, $action) {
+                                // Only TP Office can create, update, delete zones
                                 return RbacHelper::isTpOffice();
                             },
                         ],
@@ -70,8 +81,23 @@ class ZoneController extends Controller
      */
     public function actionView($id)
     {
+        $model = $this->findModel($id);
+
+        // Zone coordinators can only view zones they're assigned to
+        if (RbacHelper::isZoneCoordinator()) {
+            $user = Yii::$app->user->identity;
+            $isAssigned = \app\models\Zone::find()
+                ->innerJoin('users', 'users.zone_id = zone.zone_id AND users.role_id = 2 AND users.user_id = :userId', [':userId' => $user->user_id])
+                ->andWhere(['zone.zone_id' => $id])
+                ->exists();
+
+            if (!$isAssigned) {
+                throw new \yii\web\ForbiddenHttpException('You can only view zones assigned to you.');
+            }
+        }
+
         return $this->render('view', [
-            'model' => $this->findModel($id),
+            'model' => $model,
         ]);
     }
 

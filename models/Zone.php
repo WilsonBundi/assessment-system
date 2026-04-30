@@ -56,4 +56,14 @@ class Zone extends \yii\db\ActiveRecord
         return $this->hasMany(School::class, ['zone_id' => 'zone_id']);
     }
 
+    /**
+     * Gets query for [[Users]] - many-to-many relationship.
+     *
+     * @return \yii\db\ActiveQuery
+     */
+    public function getUsers()
+    {
+        return $this->hasMany(Users::class, ['user_id' => 'user_id'])->viaTable('user_zones', ['zone_id' => 'zone_id']);
+    }
+
 }

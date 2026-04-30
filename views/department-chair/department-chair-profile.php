@@ -303,6 +303,9 @@ $this->registerJs("
                                     <thead class="table-light">
                                         <tr>
                                             <th>Student</th>
+                                            <th>Student Name</th>
+                                            <th>Phone</th>
+                                            <th>Email</th>
                                             <th>School</th>
                                             <th>Date</th>
                                             <th>Examiner</th>
@@ -315,6 +318,9 @@ $this->registerJs("
                                         <?php foreach ($recentAssessments as $assessment): ?>
                                             <tr>
                                                 <td><?= Html::encode($assessment->student_reg_no) ?></td>
+                                                <td><?= $assessment->student ? Html::encode($assessment->student->getName()) : 'N/A' ?></td>
+                                                <td><?= $assessment->student ? Html::encode($assessment->student->phone_no ?: 'N/A') : 'N/A' ?></td>
+                                                <td><?= $assessment->student ? Html::encode($assessment->student->email ?: 'N/A') : 'N/A' ?></td>
                                                 <td><?= Html::encode($assessment->school ? $assessment->school->school_name : 'N/A') ?></td>
                                                 <td><?= Html::encode($assessment->assessment_date) ?></td>
                                                 <td><?= Html::encode($assessment->examinerUser ? $assessment->examinerUser->name : 'N/A') ?></td>

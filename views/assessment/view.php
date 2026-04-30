@@ -18,7 +18,7 @@ $this->params['breadcrumbs'][] = $this->title;
 
     <div class="page-header d-flex align-items-center justify-content-between">
         <h1><?= Html::encode($this->title) ?></h1>
-        <span class="badge <?= $model->isSubmitted ? 'bg-success' : 'bg-secondary' ?>">
+        <span class="badge <?= $model->isCompleted ? 'bg-success' : ($model->isSubmitted ? 'bg-warning' : 'bg-secondary') ?>">
             <?= Html::encode($model->statusLabel) ?>
         </span>
     </div>
@@ -28,26 +28,28 @@ $this->params['breadcrumbs'][] = $this->title;
             <?= Html::a('Student Report', ['report-student', 'assessment_id' => $model->assessment_id], ['class' => 'btn btn-warning', 'target' => '_blank']) ?>
             <?= Html::a('Office Report', ['report-office', 'assessment_id' => $model->assessment_id], ['class' => 'btn btn-warning', 'target' => '_blank']) ?>
             <?= Html::a('View Audit Log', ['audit-log', 'assessment_id' => $model->assessment_id], ['class' => 'btn btn-secondary']) ?>
-        <?php endif; ?>
 
-        <?php if (RbacHelper::isSupervisor()): ?>
-            <?= Html::a('Grade All Competencies', ['grade-grid', 'assessment_id' => $model->assessment_id], ['class' => 'btn btn-success', 'title' => 'Grade all 12 competence areas']) ?>
-            <?= Html::a('Update', ['update', 'assessment_id' => $model->assessment_id], ['class' => 'btn btn-primary']) ?>
-            <?= Html::a('Add Single Grade', ['/grade/create', 'assessment_id' => $model->assessment_id], ['class' => 'btn btn-info']) ?>
-            <?= Html::a('Submit Report', ['submit', 'assessment_id' => $model->assessment_id], [
-                'class' => 'btn btn-primary',
-                'data' => [
-                    'confirm' => 'Submit this assessment report? Once submitted it will be flagged as completed.',
-                    'method' => 'post',
-                ],
-            ]) ?>
-            <?= Html::a('Delete', ['delete', 'assessment_id' => $model->assessment_id], [
-                'class' => 'btn btn-danger',
-                'data' => [
-                    'confirm' => 'Are you sure you want to delete this item?',
-                    'method' => 'post',
-                ],
-            ]) ?>
+            <?php if (!$model->isCompleted): ?>
+                <?= Html::a('Grade All Competencies', ['grade-grid', 'assessment_id' => $model->assessment_id], ['class' => 'btn btn-success', 'title' => 'Grade all 12 competence areas']) ?>
+                <?= Html::a('Update', ['update', 'assessment_id' => $model->assessment_id], ['class' => 'btn btn-primary']) ?>
+                <?= Html::a('Add Single Grade', ['/grade/create', 'assessment_id' => $model->assessment_id], ['class' => 'btn btn-info']) ?>
+                <?= Html::a('Submit Report', ['submit', 'assessment_id' => $model->assessment_id], [
+                    'class' => 'btn btn-primary',
+                    'data' => [
+                        'confirm' => 'Submit this assessment report? Once submitted it will be flagged as completed.',
+                        'method' => 'post',
+                    ],
+                ]) ?>
+                <?= Html::a('Delete', ['delete', 'assessment_id' => $model->assessment_id], [
+                    'class' => 'btn btn-danger',
+                    'data' => [
+                        'confirm' => 'Are you sure you want to delete this item?',
+                        'method' => 'post',
+                    ],
+                ]) ?>
+            <?php else: ?>
+                <span class="badge bg-success">Completed</span>
+            <?php endif; ?>
         <?php endif; ?>
     </div>
 
@@ -55,18 +57,40 @@ $this->params['breadcrumbs'][] = $this->title;
         'model' => $model,
         'options' => ['class' => 'detail-view'],
         'attributes' => [
-            'assessment_id',
+            [
+                'attribute' => 'assessment_id',
+                'label' => 'Assessment',
+            ],
             [
                 'attribute' => 'student_reg_no',
                 'label' => 'Student Registration'
             ],
             [
+                'label' => 'Student Name',
+                'value' => $model->student ? $model->student->getName() : 'N/A'
+            ],
+            [
+                'label' => 'Student Phone',
+                'value' => $model->student ? ($model->student->phone_no ?: 'Not provided') : 'N/A'
+            ],
+            [
+                'label' => 'Student Email',
+                'value' => $model->student ? ($model->student->email ?: 'Not provided') : 'N/A',
+                'format' => 'email'
+            ],
+            [
                 'attribute' => 'examiner_user_id',
+                'label' => 'Examiner',
                 'value' => $model->examiner ? $model->examiner->name : 'N/A'
             ],
             [
                 'attribute' => 'school_id',
+                'label' => 'School',
                 'value' => $model->school ? $model->school->school_name : 'N/A'
+            ],
+            [
+                'attribute' => 'learning_area_id',
+                'value' => $model->learningArea ? $model->learningArea->learning_area_name : 'N/A'
             ],
             [
                 'attribute' => 'learning_area_id',
@@ -89,65 +113,68 @@ $this->params['breadcrumbs'][] = $this->title;
                         'EE' => '<span class="badge bg-success">EE - Exceeds Expectations (80-100)</span>'
                     ];
                     return $badges[$model->overall_level] ?? $model->overall_level;
-                },
-                'format' => 'html'
+                }
             ],
         ],
     ]) ?>
 
-    <hr>
-    <h3>Grades per Competence Area</h3>
-    
-    <?php if($model->grades && count($model->grades) > 0): ?>
-        <div class="table-responsive">
-            <table class="table table-striped table-hover">
-                <thead class="table-light">
-                    <tr>
-                        <th>#</th>
-                        <th>Competence Area</th>
-                        <th>Score</th>
-                        <th>Level</th>
-                        <th>Remarks</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php $i = 1; foreach($model->grades as $grade): ?>
+    <?php if (!empty($model->grades)): ?>
+        <div class="mt-4">
+            <h3>Competence Area Grades</h3>
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
                         <tr>
-                            <td><?= $i++ ?></td>
-                            <td><?= $grade->competenceArea ? $grade->competenceArea->competence_name : 'N/A' ?></td>
-                            <td><?= $grade->score ?>/10</td>
-                            <td>
-                                <?php
-                                $badges = [
-                                    'BE' => '<span class="badge bg-danger">BE</span>',
-                                    'AE' => '<span class="badge bg-warning text-dark">AE</span>',
-                                    'ME' => '<span class="badge bg-info">ME</span>',
-                                    'EE' => '<span class="badge bg-success">EE</span>'
-                                ];
-                                echo $badges[$grade->level] ?? $grade->level;
-                                ?>
-                            </td>
-                            <td><?= Html::encode(substr($grade->remarks ?? '', 0, 50)) ?></td>
-                            <td>
-                                <?= Html::a('View', ['/grade/view', 'grade_id' => $grade->grade_id], ['class' => 'btn btn-sm btn-info']) ?>
-                                <?php if (RbacHelper::isSupervisor()): ?>
-                                    <?= Html::a('Edit', ['/grade/update', 'grade_id' => $grade->grade_id], ['class' => 'btn btn-sm btn-primary']) ?>
-                                    <?= Html::a('Delete', ['/grade/delete', 'grade_id' => $grade->grade_id], ['class' => 'btn btn-sm btn-danger', 'data' => ['confirm' => 'Sure?', 'method' => 'post']]) ?>
-                                <?php endif; ?>
-                            </td>
+                            <th>#</th>
+                            <th>Competence Area</th>
+                            <th>Score</th>
+                            <th>Level</th>
+                            <th>Remarks</th>
+                            <th>Actions</th>
                         </tr>
-                    <?php endforeach; ?>
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody>
+                        <?php $i = 1; ?>
+                        <?php foreach ($model->grades as $grade): ?>
+                            <tr>
+                                <td><?= $i++ ?></td>
+                                <td><?= $grade->competenceArea ? $grade->competenceArea->competence_name : 'N/A' ?></td>
+                                <td><?= $grade->score ?>/10</td>
+                                <td>
+                                    <?php
+                                    $badges = [
+                                        'BE' => '<span class="badge bg-danger">BE</span>',
+                                        'AE' => '<span class="badge bg-warning text-dark">AE</span>',
+                                        'ME' => '<span class="badge bg-info">ME</span>',
+                                        'EE' => '<span class="badge bg-success">EE</span>'
+                                    ];
+                                    echo $badges[$grade->level] ?? $grade->level;
+                                    ?>
+                                </td>
+                                <td><?= Html::encode(substr($grade->remarks ?? '', 0, 50)) ?></td>
+                                <td>
+                                    <?= Html::a('View', ['/grade/view', 'grade_id' => $grade->grade_id], ['class' => 'btn btn-sm btn-info']) ?>
+                                    <?php if (RbacHelper::isTpOffice() && !$model->isCompleted): ?>
+                                        <?= Html::a('Edit', ['/grade/update', 'grade_id' => $grade->grade_id], ['class' => 'btn btn-sm btn-primary']) ?>
+                                        <?= Html::a('Delete', ['/grade/delete', 'grade_id' => $grade->grade_id], ['class' => 'btn btn-sm btn-danger', 'data' => ['confirm' => 'Sure?', 'method' => 'post']]) ?>
+                                    <?php endif; ?>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
         </div>
     <?php else: ?>
-        <div class="alert alert-warning">
-            No grades added yet.
-            <?php if (RbacHelper::isSupervisor()): ?>
+        <?php if (RbacHelper::isSupervisor() && !$model->isCompleted): ?>
+            <div class="alert alert-warning mt-4">
                 <?= Html::a('Add grades', ['/grade/create', 'assessment_id' => $model->assessment_id], ['class' => 'alert-link']) ?>
-            <?php endif; ?>
-        </div>
+            </div>
+        <?php elseif (RbacHelper::isSupervisor() && $model->isCompleted): ?>
+            <div class="alert alert-success mt-4">
+                Assessment completed. Grades can no longer be added or edited.
+            </div>
+        <?php endif; ?>
     <?php endif; ?>
 
     <hr>

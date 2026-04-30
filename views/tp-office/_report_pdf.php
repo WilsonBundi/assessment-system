@@ -23,7 +23,7 @@ h1, h2, h3 { color: #2E75B6; margin-top: 30px; margin-bottom: 15px; }
     <table class="table">
         <tbody>
             <tr>
-                <th>Assessment ID</th>
+                <th>Assessment</th>
                 <td><?= Html::encode($assessment->assessment_id) ?></td>
             </tr>
             <tr>

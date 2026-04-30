@@ -29,6 +29,12 @@ class GradeController extends Controller
                     'rules' => [
                         [
                             'allow' => true,
+                            'actions' => ['view', 'delete'],
+                            'roles' => ['@'],
+                        ],
+                        [
+                            'allow' => true,
+                            'actions' => ['index', 'create', 'update'],
                             'roles' => ['@'],
                             'matchCallback' => function ($rule, $action) {
                                 return RbacHelper::isTpOffice();
@@ -158,11 +164,18 @@ class GradeController extends Controller
             throw new NotFoundHttpException('Grade ID is required.');
         }
         
+        $grade = $this->findModel($grade_id);
+        $assessment = $grade->assessment;
+
         if (!RbacHelper::isTpOffice()) {
+            if ($assessment && $assessment->isCompleted) {
+                Yii::$app->session->setFlash('info', 'Assessment completed. Grade deletion is not allowed.');
+                return $this->redirect(['/assessment/view', 'assessment_id' => $assessment->assessment_id]);
+            }
             throw new \yii\web\ForbiddenHttpException('Only TP Office users can delete grades.');
         }
 
-        $this->findModel($grade_id)->delete();
+        $grade->delete();
 
         return $this->redirect(['index']);
     }

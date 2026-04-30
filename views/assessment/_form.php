@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 
 use yii\helpers\Html;
 use yii\helpers\ArrayHelper;
@@ -6,6 +6,7 @@ use yii\helpers\Url;
 use yii\widgets\ActiveForm;
 use app\models\Users;
 use app\models\School;
+use app\models\SchoolClass;
 use app\models\LearningArea;
 use app\models\Strand;
 use app\models\Substrand;
@@ -41,7 +42,7 @@ use app\models\Grade;
             $supervisors = \app\models\Users::find()->where(['user_id' => $supervisorIds])->all();
             echo $form->field($model, 'examiner_user_id')->dropDownList(
                 ArrayHelper::map($supervisors, 'user_id', 'name'),
-                ['prompt' => 'Select Examiner...', 'class' => 'form-control']
+                ['prompt' => 'Select Examiner...', 'class' => 'form-control searchable-select', 'data-placeholder' => 'Select Examiner...']
             );
             ?>
         </div>
@@ -66,17 +67,64 @@ use app\models\Grade;
             }
             echo $form->field($model, 'school_id')->dropDownList(
                 $schoolOptions,
-                ['prompt' => 'Select School...', 'class' => 'form-control']
+                ['prompt' => 'Select School...', 'class' => 'form-control searchable-select', 'data-placeholder' => 'Select School...', 'id' => 'school-select']
             );
             ?>
         </div>
         <div class="col-md-6">
+            <?php
+            $classOptions = [];
+            $selectedSchoolId = $model->school_id;
+
+            if ($model->class_id && !$selectedSchoolId) {
+                $selectedClass = SchoolClass::findOne($model->class_id);
+                if ($selectedClass) {
+                    $selectedSchoolId = $selectedClass->school_id;
+                }
+            }
+
+            if ($model->student_reg_no) {
+                $student = \app\models\Students::findOne(['student_reg_no' => $model->student_reg_no]);
+                if ($student && $student->class_id) {
+                    $class = SchoolClass::findOne(['class_id' => $student->class_id]);
+                    if ($class && (!$selectedSchoolId || $class->school_id == $selectedSchoolId)) {
+                        $classOptions = [$class->class_id => $class->class_name];
+                        $selectedSchoolId = $class->school_id;
+                    }
+                }
+            }
+
+            if (empty($classOptions) && $selectedSchoolId) {
+                $classOptions = ArrayHelper::map(
+                    SchoolClass::find()->where(['school_id' => $selectedSchoolId])->all(),
+                    'class_id',
+                    'class_name'
+                );
+            }
+
+            echo $form->field($model, 'class_id')->dropDownList(
+                $classOptions,
+                ['prompt' => 'Select Class...', 'class' => 'form-control searchable-select', 'data-placeholder' => 'Select Class...', 'id' => 'class-select']
+            );
+            ?>
+            <?php if ($model->school_id && empty($classOptions)): ?>
+                <div class="mt-2" style="color: #000;">
+                    <small>There are currently no classes available for the selected school. Please ask TP Office to add classes for this school.</small>
+                </div>
+            <?php endif; ?>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-6">
             <?= $form->field($model, 'learning_area_id')->dropDownList(
                 ArrayHelper::map(LearningArea::find()->all(), 'learning_area_id', 'learning_area_name'),
-                ['prompt' => 'Select Learning Area...', 'class' => 'form-control', 'id' => 'learning-area-select']
+                ['prompt' => 'Select Learning Area...', 'class' => 'form-select', 'id' => 'learning-area-select']
             ) ?>
         </div>
     </div>
+
+    <div id="strand-feedback" class="alert alert-warning d-none" role="alert" style="margin-top: 15px;"></div>
 
     <div class="row">
         <div class="col-md-6">
@@ -86,7 +134,7 @@ use app\models\Grade;
                     'strand_id',
                     'name'
                 ) : [],
-                ['prompt' => 'Select Strand...', 'class' => 'form-control', 'id' => 'strand-select']
+                ['prompt' => 'Select Strand...', 'class' => 'form-control searchable-select', 'data-placeholder' => 'Select Strand...', 'id' => 'strand-select']
             ) ?>
         </div>
         <div class="col-md-6">
@@ -96,7 +144,7 @@ use app\models\Grade;
                     'substrand_id',
                     'name'
                 ) : [],
-                ['prompt' => 'Select Substrand...', 'class' => 'form-control', 'id' => 'substrand-select']
+                ['prompt' => 'Select Substrand...', 'class' => 'form-control searchable-select', 'data-placeholder' => 'Select Substrand...', 'id' => 'substrand-select']
             ) ?>
         </div>
     </div>
@@ -311,64 +359,125 @@ use app\models\Grade;
 
     <?php
     // Register JavaScript for dynamic dropdown filtering
-    $this->registerJs("
+    $getClassesUrl = Url::to(['get-classes']);
+    $getStudentDetailsUrl = Url::to(['get-student-details']);
+    $getStrandsUrl = Url::to(['get-strands']);
+    $getSubstrandsUrl = Url::to(['get-substrands']);
+    $js = <<<JS
     $(document).ready(function() {
-        // Handle Learning Area change - load Strands
+        function populateClasses(schoolId, selectedClassId) {
+            $('#class-select').empty().append('<option value="">Select Class...</option>');
+            if (!schoolId) {
+                return;
+            }
+            $.ajax({
+                url: '$getClassesUrl',
+                type: 'GET',
+                data: {school_id: schoolId},
+                dataType: 'json',
+                success: function(response) {
+                    if (response.classes && Object.keys(response.classes).length > 0) {
+                        $.each(response.classes, function(classId, className) {
+                            $('#class-select').append($('<option></option>')
+                                .attr('value', classId)
+                                .text(className));
+                        });
+                        if (selectedClassId) {
+                            $('#class-select').val(selectedClassId);
+                        }
+                    }
+                }
+            });
+        }
+
+        // Handle Student selection/change - load student school and class
+        $('#assessment-student_reg_no').on('change blur', function() {
+            var studentRegNo = $(this).val().trim();
+            if (!studentRegNo) {
+                return;
+            }
+
+            $.ajax({
+                url: '$getStudentDetailsUrl',
+                type: 'GET',
+                data: {student_reg_no: studentRegNo},
+                dataType: 'json',
+                success: function(response) {
+                    if (response.student && response.student.school_id) {
+                        $('#school-select').val(response.student.school_id);
+                        populateClasses(response.student.school_id, response.student.class_id);
+                    }
+                }
+            });
+        });
+
+        // Handle School change - load Classes
         $('#learning-area-select').on('change', function() {
             var learningAreaId = $(this).val();
-            
+
             // Reset Strand and Substrand dropdowns
-            $('#strand-select').empty().append('<option value=\"\">Select Strand...</option>');
-            $('#substrand-select').empty().append('<option value=\"\">Select Substrand...</option>');
-            
+            $('#strand-select').empty().append(new Option('Select Strand...', '', false, false)).trigger('change');
+            $('#substrand-select').empty().append(new Option('Select Substrand...', '', false, false)).trigger('change');
+            setAssessmentFeedback('');
+
             if (learningAreaId) {
                 $.ajax({
-                    url: '" . Url::to(['get-strands']) . "',
+                    url: '$getStrandsUrl',
                     type: 'GET',
                     data: {learning_area_id: learningAreaId},
                     dataType: 'json',
                     success: function(response) {
                         if (response.strands && Object.keys(response.strands).length > 0) {
                             $.each(response.strands, function(strandId, strandName) {
-                                $('#strand-select').append($('<option></option>')
-                                    .attr('value', strandId)
-                                    .text(strandName));
+                                $('#strand-select').append(new Option(strandName, strandId, false, false));
                             });
+                            $('#strand-select').trigger('change');
+                        } else {
+                            setAssessmentFeedback('No strands are defined for the selected learning area. Please ask TP Office to create strands before continuing.');
                         }
+                    },
+                    error: function() {
+                        setAssessmentFeedback('Unable to load strands right now. Please try again or contact support.');
                     }
                 });
             }
         });
-        
+
         // Handle Strand change - load Substrands
         $('#strand-select').on('change', function() {
             var strandId = $(this).val();
-            
-            // Reset Substrand dropdown
-            $('#substrand-select').empty().append('<option value=\"\">Select Substrand...</option>');
-            
+
+            $('#substrand-select').empty().append(new Option('Select Substrand...', '', false, false)).trigger('change');
+            setAssessmentFeedback('');
+
             if (strandId) {
                 $.ajax({
-                    url: '" . Url::to(['get-substrands']) . "',
+                    url: '$getSubstrandsUrl',
                     type: 'GET',
                     data: {strand_id: strandId},
                     dataType: 'json',
                     success: function(response) {
                         if (response.substrands && Object.keys(response.substrands).length > 0) {
                             $.each(response.substrands, function(substrandId, substrandName) {
-                                $('#substrand-select').append($('<option></option>')
-                                    .attr('value', substrandId)
-                                    .text(substrandName));
+                                $('#substrand-select').append(new Option(substrandName, substrandId, false, false));
                             });
+                            $('#substrand-select').trigger('change');
+                        } else {
+                            setAssessmentFeedback('No substrands are defined for the selected strand. Please ask TP Office to create substrands before continuing.');
                         }
+                    },
+                    error: function() {
+                        setAssessmentFeedback('Unable to load substrands right now. Please try again or contact support.');
                     }
                 });
             }
         });
     });
-    ");
+    JS;
+    $this->registerJs($js);
     ?>
 
+</div>
 </div>
 
 <?php if (!$model->isNewRecord): ?>
@@ -507,7 +616,7 @@ $this->registerJs("
         persistState();
     });
 
-    // Select/Deselect all competence rows
+    //Â Select/Deselect all competence rows
     $('#select-all-competence').on('change', function() {
         var checked = $(this).is(':checked');
         $('.rubric-checkbox').prop('checked', checked);

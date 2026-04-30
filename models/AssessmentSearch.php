@@ -19,7 +19,7 @@ class AssessmentSearch extends Assessment
     public function rules()
     {
         return [
-            [['assessment_id', 'examiner_user_id', 'school_id', 'learning_area_id', 'total_score', 'zone_id', 'validated_by'], 'integer'],
+            [['assessment_id', 'examiner_user_id', 'school_id', 'class_id', 'learning_area_id', 'total_score', 'zone_id', 'validated_by'], 'integer'],
             [['student_reg_no', 'assessment_date', 'start_time', 'end_time', 'overall_level'], 'safe'],
         ];
     }
@@ -64,6 +64,7 @@ class AssessmentSearch extends Assessment
             'assessment.assessment_id' => $this->assessment_id,
             'assessment.examiner_user_id' => $this->examiner_user_id,
             'assessment.school_id' => $this->school_id,
+            'assessment.class_id' => $this->class_id,
             'assessment.learning_area_id' => $this->learning_area_id,
             'assessment.assessment_date' => $this->assessment_date,
             'assessment.start_time' => $this->start_time,

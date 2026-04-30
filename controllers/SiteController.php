@@ -67,6 +67,19 @@ class SiteController extends Controller
     public function actionIndex()
     {
         if (!Yii::$app->user->isGuest) {
+            $roleId = Yii::$app->user->identity->role_id;
+            if ($roleId == 1) {
+                return $this->redirect(['supervisor/profile']);
+            }
+            if ($roleId == 2) {
+                return $this->redirect(['zone-coordinator/profile']);
+            }
+            if ($roleId == 3) {
+                return $this->redirect(['tp-office/index']);
+            }
+            if ($roleId == 4) {
+                return $this->redirect(['department-chair/profile']);
+            }
             return $this->redirect(['site/dashboard']);
         }
 
@@ -76,6 +89,20 @@ class SiteController extends Controller
             Yii::$app->session->remove('dashboardStats');
             Yii::$app->session->remove('dashboardStats_time');
             Yii::$app->session->setFlash('success', 'Login successful! Redirecting to dashboard...');
+
+            $roleId = Yii::$app->user->identity->role_id;
+            if ($roleId == 1) {
+                return $this->redirect(['supervisor/profile']);
+            }
+            if ($roleId == 2) {
+                return $this->redirect(['zone-coordinator/profile']);
+            }
+            if ($roleId == 3) {
+                return $this->redirect(['tp-office/index']);
+            }
+            if ($roleId == 4) {
+                return $this->redirect(['department-chair/profile']);
+            }
             return $this->redirect(['site/dashboard']);
         } elseif ($model->load(Yii::$app->request->post())) {
             // Login failed - add debug info
@@ -119,8 +146,23 @@ class SiteController extends Controller
                 if ($user->role_id == 1) {
                     // Supervisor-specific stats
                     $stats = [
+                        'overviewTitle' => 'Supervisor Overview',
                         'totalAssessments' => Assessment::find()
                             ->where(['examiner_user_id' => $user->user_id])
+                            ->count(),
+                        'pendingValidation' => Assessment::find()
+                            ->where(['examiner_user_id' => $user->user_id])
+                            ->andWhere(['archived' => 1])
+                            ->andWhere(['is', 'validated_by', null])
+                            ->count(),
+                        'inProgressAssessments' => Assessment::find()
+                            ->where(['examiner_user_id' => $user->user_id])
+                            ->andWhere(['or', ['archived' => 0], ['archived' => null]])
+                            ->andWhere(['is', 'validated_by', null])
+                            ->count(),
+                        'validatedAssessments' => Assessment::find()
+                            ->where(['examiner_user_id' => $user->user_id])
+                            ->andWhere(['is not', 'validated_by', null])
                             ->count(),
                         'totalSchools' => Assessment::find()
                             ->select(['DISTINCT school_id'])
@@ -132,10 +174,61 @@ class SiteController extends Controller
                             ->where(['examiner_user_id' => $user->user_id])
                             ->count(),
                     ];
-                } else {
-                    // System-wide stats for admin/coordinators
+                } elseif ($user->role_id == 2) {
+                    // Zone coordinator-specific stats limited to assigned zones
+                    $assignedZoneIds = \app\models\Zone::find()
+                        ->innerJoin('user_zones', 'user_zones.zone_id = zone.zone_id AND user_zones.user_id = :userId', [':userId' => $user->user_id])
+                        ->select('zone.zone_id')
+                        ->column();
+                    $zoneCondition = ['school.zone_id' => $assignedZoneIds ?: [0]];
+
                     $stats = [
+                        'overviewTitle' => 'Assigned Zone Overview',
+                        'totalAssessments' => Assessment::find()
+                            ->innerJoin('school', 'school.school_id = assessment.school_id')
+                            ->andWhere($zoneCondition)
+                            ->count(),
+                        'pendingValidation' => Assessment::find()
+                            ->innerJoin('school', 'school.school_id = assessment.school_id')
+                            ->andWhere($zoneCondition)
+                            ->andWhere(['archived' => 1])
+                            ->andWhere(['is', 'validated_by', null])
+                            ->count(),
+                        'inProgressAssessments' => Assessment::find()
+                            ->innerJoin('school', 'school.school_id = assessment.school_id')
+                            ->andWhere($zoneCondition)
+                            ->andWhere(['or', ['archived' => 0], ['archived' => null]])
+                            ->andWhere(['is', 'validated_by', null])
+                            ->count(),
+                        'validatedAssessments' => Assessment::find()
+                            ->innerJoin('school', 'school.school_id = assessment.school_id')
+                            ->andWhere($zoneCondition)
+                            ->andWhere(['is not', 'validated_by', null])
+                            ->count(),
+                        'totalSchools' => School::find()
+                            ->innerJoin('user_zones', 'user_zones.zone_id = school.zone_id AND user_zones.user_id = :userId', [':userId' => $user->user_id])
+                            ->select(['school_id' => 'school.school_id'])
+                            ->distinct()
+                            ->count('DISTINCT school_id'),
+                        'totalGrades' => Grade::find()->count(),
+                        'totalLearningAreas' => LearningArea::find()->count(),
+                    ];
+                } else {
+                    // System-wide stats for admin and other roles
+                    $stats = [
+                        'overviewTitle' => 'System Overview',
                         'totalAssessments' => Assessment::find()->count(),
+                        'pendingValidation' => Assessment::find()
+                            ->andWhere(['archived' => 1])
+                            ->andWhere(['is', 'validated_by', null])
+                            ->count(),
+                        'inProgressAssessments' => Assessment::find()
+                            ->andWhere(['or', ['archived' => 0], ['archived' => null]])
+                            ->andWhere(['is', 'validated_by', null])
+                            ->count(),
+                        'validatedAssessments' => Assessment::find()
+                            ->andWhere(['is not', 'validated_by', null])
+                            ->count(),
                         'totalSchools' => School::find()->count(),
                         'totalGrades' => Grade::find()->count(),
                         'totalLearningAreas' => LearningArea::find()->count(),
@@ -155,9 +248,15 @@ class SiteController extends Controller
                     ->limit(10)
                     ->all();
             } elseif ($user->role_id == 2) { // Zone Coordinator
+                $assignedZoneIds = \app\models\Zone::find()
+                    ->innerJoin('user_zones', 'user_zones.zone_id = zone.zone_id AND user_zones.user_id = :userId', [':userId' => $user->user_id])
+                    ->select('zone.zone_id')
+                    ->column();
+                $zoneCondition = ['school.zone_id' => $assignedZoneIds ?: [0]];
+
                 $recentAssessments = Assessment::find()
                     ->joinWith('school')
-                    ->where(['school.zone_id' => $user->zone_id])
+                    ->andWhere($zoneCondition)
                     ->andWhere(['or', ['assessment.archived' => 0], ['assessment.archived' => null]])
                     ->orderBy(['assessment.assessment_date' => SORT_DESC, 'assessment.assessment_id' => SORT_DESC])
                     ->limit(10)

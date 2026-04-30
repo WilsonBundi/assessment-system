@@ -2,6 +2,7 @@
 
 namespace app\controllers;
 
+use Yii;
 use app\models\Students;
 use app\models\StudentsSearch;
 use yii\web\Controller;
@@ -13,14 +14,34 @@ use yii\filters\VerbFilter;
  */
 class StudentsController extends Controller
 {
-    /**
-     * @inheritDoc
-     */
     public function behaviors()
     {
         return array_merge(
             parent::behaviors(),
             [
+                'access' => [
+                    'class' => \yii\filters\AccessControl::class,
+                    'rules' => [
+                        [
+                            'actions' => ['index', 'view'],
+                            'allow' => true,
+                            'roles' => ['@'],
+                            'matchCallback' => function ($rule, $action) {
+                                // Allow all authenticated users to view students
+                                return !Yii::$app->user->isGuest;
+                            },
+                        ],
+                        [
+                            'actions' => ['create', 'update', 'delete'],
+                            'allow' => true,
+                            'roles' => ['@'],
+                            'matchCallback' => function ($rule, $action) {
+                                // Only TP Office can create, update, delete students
+                                return \app\components\RbacHelper::isTpOffice();
+                            },
+                        ],
+                    ],
+                ],
                 'verbs' => [
                     'class' => VerbFilter::className(),
                     'actions' => [
@@ -49,14 +70,32 @@ class StudentsController extends Controller
 
     /**
      * Displays a single Students model.
-     * @param int $student_id Student ID
+     * @param int|string $student_id Student ID or Student Registration Number
      * @return string
      * @throws NotFoundHttpException if the model cannot be found
      */
-    public function actionView($student_id)
+    public function actionView($student_id = null)
     {
+        // Handle both route parameter and query parameter
+        $studentIdentifier = $student_id ?? Yii::$app->request->get('student_reg_no') ?? Yii::$app->request->get('student_id');
+
+        if (!$studentIdentifier) {
+            throw new \yii\web\BadRequestHttpException('Missing required parameters: student_id');
+        }
+
+        // Check if student_id is numeric (ID) or string (registration number)
+        if (is_numeric($studentIdentifier)) {
+            $model = Students::findOne(['student_id' => $studentIdentifier]);
+        } else {
+            $model = Students::findOne(['student_reg_no' => $studentIdentifier]);
+        }
+
+        if ($model === null) {
+            throw new \yii\web\NotFoundHttpException('The requested student does not exist.');
+        }
+
         return $this->render('view', [
-            'model' => $this->findModel($student_id),
+            'model' => $model,
         ]);
     }
 
@@ -85,16 +124,32 @@ class StudentsController extends Controller
     /**
      * Updates an existing Students model.
      * If update is successful, the browser will be redirected to the 'view' page.
-     * @param int $student_id Student ID
+     * @param int|string $student_id Student ID or Student Registration Number
      * @return string|\yii\web\Response
      * @throws NotFoundHttpException if the model cannot be found
      */
-    public function actionUpdate($student_id)
+    public function actionUpdate($student_id = null)
     {
-        $model = $this->findModel($student_id);
+        // Handle both route parameter and query parameter
+        $studentIdentifier = $student_id ?? Yii::$app->request->get('student_reg_no') ?? Yii::$app->request->get('student_id');
+
+        if (!$studentIdentifier) {
+            throw new \yii\web\BadRequestHttpException('Missing required parameters: student_id');
+        }
+
+        // Check if student_id is numeric (ID) or string (registration number)
+        if (is_numeric($studentIdentifier)) {
+            $model = Students::findOne(['student_id' => $studentIdentifier]);
+        } else {
+            $model = Students::findOne(['student_reg_no' => $studentIdentifier]);
+        }
+
+        if ($model === null) {
+            throw new \yii\web\NotFoundHttpException('The requested student does not exist.');
+        }
 
         if ($this->request->isPost && $model->load($this->request->post()) && $model->save()) {
-            return $this->redirect(['view', 'student_id' => $model->student_id]);
+            return $this->redirect(['view', 'student_id' => $model->student_reg_no]);
         }
 
         return $this->render('update', [

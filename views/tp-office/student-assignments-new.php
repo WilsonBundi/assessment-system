@@ -119,8 +119,8 @@ $activeTab = Yii::$app->request->get('tab', 'assign');
                                                             }
                                                         ?>
                                                         <?= Html::dropDownList('supervisor_user_id', null, $zoneSupervisors, [
-                                                            'class' => 'form-select form-select-sm',
-                                                            'prompt' => '-- Select Supervisor --',
+                                                            'class' => 'form-select form-select-sm searchable-select',
+                                                            'data-placeholder' => '-- Select Supervisor --',
                                                             'required' => true
                                                         ]) ?>
                                                     </div>
@@ -133,8 +133,8 @@ $activeTab = Yii::$app->request->get('tab', 'assign');
                                                             }
                                                         ?>
                                                         <?= Html::dropDownList('student_reg_no', null, $zoneStudents, [
-                                                            'class' => 'form-select form-select-sm',
-                                                            'prompt' => '-- Select Student --',
+                                                            'class' => 'form-select form-select-sm searchable-select',
+                                                            'data-placeholder' => '-- Select Student --',
                                                             'required' => true
                                                         ]) ?>
                                                     </div>
@@ -315,8 +315,8 @@ $activeTab = Yii::$app->request->get('tab', 'assign');
                 <div class="modal-body">
                     <label class="form-label fw-bold mb-2">Select New Supervisor</label>
                     <?= Html::dropDownList('supervisor_user_id', null, $supervisorsMap, [
-                        'class' => 'form-select',
-                        'prompt' => '-- Choose a supervisor --',
+                        'class' => 'form-select searchable-select',
+                        'data-placeholder' => '-- Choose a supervisor --',
                         'id' => 'reassign-supervisor-select',
                         'required' => true
                     ]) ?>

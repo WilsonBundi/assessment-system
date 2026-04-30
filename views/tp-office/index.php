@@ -170,6 +170,10 @@ $this->registerJs("
             <div class="action-title">Supervisor Assignment</div>
             <div class="action-button">ASSIGN SUPERVISORS</div>
         </a>
+        <a href="<?= \yii\helpers\Url::to(['zone-coordinator-assign']) ?>" class="action-card">
+            <div class="action-title">Zone Coordinator Assignment</div>
+            <div class="action-button">ASSIGN COORDINATORS</div>
+        </a>
     </div>
 
     <!-- Recent Assessments -->

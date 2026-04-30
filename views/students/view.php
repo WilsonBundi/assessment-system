@@ -6,7 +6,7 @@ use yii\widgets\DetailView;
 /** @var yii\web\View $this */
 /** @var app\models\Students $model */
 
-$this->title = $model->student_id;
+$this->title = $model->getName() . ' (' . $model->student_reg_no . ')';
 $this->params['breadcrumbs'][] = ['label' => 'Students', 'url' => ['index']];
 $this->params['breadcrumbs'][] = $this->title;
 \yii\web\YiiAsset::register($this);
@@ -33,9 +33,21 @@ $this->params['breadcrumbs'][] = $this->title;
             'student_reg_no',
             'surname',
             'other_name',
-            'phone_no',
-            'email:email',
-            'school_id',
+            [
+                'attribute' => 'phone_no',
+                'label' => 'Phone Number',
+                'value' => $model->phone_no ?: 'Not provided',
+            ],
+            [
+                'attribute' => 'email',
+                'format' => 'email',
+                'value' => $model->email ?: 'Not provided',
+            ],
+            [
+                'attribute' => 'school_id',
+                'label' => 'School',
+                'value' => $model->school ? $model->school->school_name : 'Not assigned',
+            ],
         ],
     ]) ?>
 

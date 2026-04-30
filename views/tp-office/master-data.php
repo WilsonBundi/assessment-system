@@ -81,6 +81,19 @@ $this->params['breadcrumbs'][] = $this->title;
         <div class="col-md-4 mb-4">
             <div class="card h-100">
                 <div class="card-body text-center">
+                    <i class="fas fa-chalkboard-teacher fa-3x text-primary mb-3"></i>
+                    <h3 class="text-primary"><?= $stats['classes'] ?></h3>
+                    <p class="text-muted mb-3">School Classes</p>
+                    <div class="btn-group-vertical w-100">
+                        <?= Html::a('<i class="fas fa-list"></i> View All', ['/school-class/index'], ['class' => 'btn btn-outline-primary mb-1']) ?>
+                        <?= Html::a('<i class="fas fa-plus"></i> Add New', ['/school-class/create'], ['class' => 'btn btn-primary']) ?>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 mb-4">
+            <div class="card h-100">
+                <div class="card-body text-center">
                     <i class="fas fa-stream fa-3x text-danger mb-3"></i>
                     <h3 class="text-danger"><?= $stats['strands'] ?></h3>
                     <p class="text-muted mb-3">Strands</p>

@@ -1,8 +1,6 @@
 <?php
 use yii\helpers\Html;
 use yii\helpers\Url;
-use yii\grid\GridView;
-use app\components\RbacHelper;
 
 $this->title = 'Zone Coordinator Profile';
 $this->params['breadcrumbs'][] = ['label' => 'Dashboard', 'url' => ['/site/dashboard']];
@@ -48,21 +46,202 @@ $this->params['breadcrumbs'][] = 'Zone Coordinator Profile';
         font-size: 0.95rem;
         font-weight: 700;
     }
+    .zone-card {
+        background: linear-gradient(135deg, #87CEEB 0%, #4682B4 100%);
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 20px;
+        color: white;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        transition: transform 0.2s ease;
+    }
+    .zone-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+    }
+    .zone-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 15px;
+    }
+    .zone-title {
+        display: flex;
+        align-items: center;
+        cursor: pointer;
+        flex: 1;
+    }
+    .zone-title a,
+    .zone-title button {
+        cursor: pointer;
+    }
+    .school-count-link,
+    .student-count-link {
+        cursor: pointer;
+    }
+    .zone-title:hover {
+        opacity: 0.8;
+    }
+    .school-card {
+        background: #f8f9fa;
+        border: 1px solid #e9ecef;
+        border-radius: 8px;
+        padding: 15px;
+        margin-bottom: 15px;
+        transition: box-shadow 0.2s ease;
+    }
+    .school-card:hover {
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    .school-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 10px;
+        cursor: pointer;
+    }
+    .school-title {
+        display: flex;
+        align-items: center;
+        flex: 1;
+    }
+    .school-title:hover {
+        color: #007bff;
+    }
+    /* New improved school list styling */
+    .school-list-item {
+        margin-bottom: 10px;
+    }
+    .school-card.border.rounded {
+        transition: all 0.3s ease;
+        border-left: 4px solid #007bff !important;
+        background: #f8f9fa;
+        cursor: pointer;
+    }
+    .school-card.border.rounded:hover {
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        transform: translateY(-1px);
+    }
+    .school-info {
+        flex: 1;
+    }
+    .school-title.fw-bold.text-primary {
+        font-size: 1.1rem;
+        margin-bottom: 4px;
+    }
+    .school-stats {
+        font-size: 0.9rem;
+    }
+    .student-list.collapse {
+        border-top: 1px solid #dee2e6;
+        padding-top: 15px;
+        margin-top: 15px;
+    }
+    .student-container {
+        max-height: 300px;
+        overflow-y: auto;
+    }
+    .student-list {
+        max-height: 400px;
+        overflow-y: auto;
+        border: 1px solid #e9ecef;
+        border-radius: 4px;
+        background: white;
+    }
+    .student-item {
+        padding: 12px 15px;
+        border-bottom: 1px solid #f0f0f0;
+        font-size: 0.9rem;
+        cursor: pointer;
+        transition: background-color 0.2s ease;
+        display: block;
+        text-decoration: none;
+        color: inherit;
+    }
+    .student-item:hover {
+        background-color: #f8f9fa;
+        text-decoration: none;
+        color: inherit;
+    }
+    .student-item:last-child {
+        border-bottom: none;
+    }
+    .student-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 8px;
+    }
+    .student-name {
+        font-weight: 600;
+        color: #007bff;
+        font-size: 1rem;
+    }
+    .student-reg-no {
+        font-weight: 500;
+        color: #6c757d;
+        font-size: 0.85rem;
+    }
+    .student-details {
+        display: flex;
+        gap: 15px;
+        flex-wrap: wrap;
+        font-size: 0.85rem;
+        color: #495057;
+    }
+    .student-detail-item {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+    }
+    .student-detail-item i {
+        width: 14px;
+        color: #6c757d;
+    }
+    .pagination-container {
+        display: flex;
+        justify-content: center;
+        margin-top: 20px;
+    }
+    .load-more-btn {
+        background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+        border: none;
+        color: white;
+        padding: 10px 20px;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: transform 0.2s ease;
+    }
+    .load-more-btn:hover {
+        transform: translateY(-1px);
+        color: white;
+    }
+    .collapse-content {
+        max-height: 500px;
+        overflow-y: auto;
+    }
 </style>
 
 <?php
-$this->registerJs("
+$studentViewUrl = Url::to(['students/view']);
+$schoolViewUrl = Url::to(['school/view']);
+$manageZonesUrl = Url::to(['zone-coordinator/manage-zones']);
+$this->registerJs(<<<JS
     var lastUpdate = Date.now();
     var updateInterval = 30000; // 30 seconds
+    var currentZonePage = {};
+    var currentSchoolPage = {};
+    var studentViewUrl = '$studentViewUrl';
+    var schoolViewUrl = '$schoolViewUrl';
+    var manageZonesUrl = '$manageZonesUrl';
 
     function updateZoneCoordinatorProfile() {
         $.ajax({
-            url: '" . \yii\helpers\Url::to(['zone-coordinator/get-profile-data']) . "',
+            url: 'index.php?r=zone-coordinator/get-profile-data',
             type: 'GET',
             data: { last_update: lastUpdate },
             success: function(data) {
                 if (data.updated) {
-                    // Update statistics silently
                     $('.stat-box h3').each(function() {
                         var label = $(this).next('p').text();
                         if (label.includes('Total Assessments')) {
@@ -71,8 +250,6 @@ $this->registerJs("
                             $(this).text(data.validatedAssessments);
                         } else if (label.includes('Pending Validation')) {
                             $(this).text(data.pendingValidation);
-                        } else if (label.includes('Schools')) {
-                            $(this).text(data.schoolCount);
                         }
                     });
 
@@ -85,229 +262,283 @@ $this->registerJs("
         });
     }
 
+    $('#assigned-zone-select').on('change', function() {
+        var zoneId = $(this).val();
+        if (!zoneId) {
+            return;
+        }
+
+        var firstSchoolId = $(this).find('option:selected').data('first-school-id');
+        var url = '$manageZonesUrl?zone_id=' + encodeURIComponent(zoneId);
+        if (firstSchoolId) {
+            url += '&school_id=' + encodeURIComponent(firstSchoolId);
+        }
+        window.location.href = url;
+    });
+
+    $(document).on('click', '.school-count-link', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        var zoneId = $(this).data('zone-id');
+        window.location.href = '$manageZonesUrl?zone_id=' + encodeURIComponent(zoneId);
+    });
+
+    $(document).on('click', '.student-count-link', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        var zoneId = $(this).data('zone-id');
+        var schoolId = $(this).data('first-school-id');
+        var url = '$manageZonesUrl?zone_id=' + encodeURIComponent(zoneId);
+        if (schoolId) {
+            url += '&school_id=' + encodeURIComponent(schoolId);
+        }
+        window.location.href = url;
+    });
+
+
+    // Handle school card click: open school view instead of zone management
+    $(document).on('click', '.school-card', function(e) {
+        if ($(e.target).closest('.student-list, a, button').length) {
+            return;
+        }
+        e.stopPropagation();
+
+        var schoolId = $(this).data('school-id');
+        window.location.href = schoolViewUrl + '?school_id=' + encodeURIComponent(schoolId);
+    });
+
+    // Handle student item click so it opens student view instead of falling back to zone navigation
+    $(document).on('click', '.student-item', function(e) {
+        e.stopPropagation();
+        var href = $(this).attr('href');
+        if (href) {
+            window.location.href = href;
+        }
+    });
+
+    // Manage button click should also navigate to manage zones
+    $(document).on('click', '.manage-zone-btn', function(e) {
+        e.stopPropagation();
+        var zoneId = $(this).data('zone-id');
+        window.location.href = '$manageZonesUrl?zone_id=' + encodeURIComponent(zoneId);
+    });
+
+    function loadZoneSchools(zoneId, container) {
+        currentZonePage[zoneId] = currentZonePage[zoneId] || 1;
+        $.ajax({
+            url: 'index.php?r=zone-coordinator/get-zone-schools',
+            type: 'GET',
+            data: { zone_id: zoneId, page: currentZonePage[zoneId] },
+            beforeSend: function() {
+                container.html('<div class="text-center p-3">Loading schools...</div>');
+            },
+            success: function(data) {
+                if (data.schools && data.schools.length > 0) {
+                    data.schools.forEach(function(schoolInfo) {
+                        container.append(generateSchoolHtml(schoolInfo, zoneId));
+                        var schoolId = schoolInfo.school.school_id;
+                        var studentContainer = container.find('.school-card[data-school-id="' + schoolId + '"]').find('.student-container');
+                        loadSchoolStudents(schoolId, studentContainer);
+                    });
+                    if (data.hasMore) {
+                        container.append('<div class=\"text-center mt-2\"><button class=\"load-more-btn\" data-zone-id=\"' + zoneId + '\">Load More Schools</button></div>');
+                    }
+                } else {
+                    container.html('<div class=\"text-muted p-2\">No schools found for this zone.</div>');
+                }
+            },
+            error: function() {
+                container.html('<div class=\"alert alert-danger p-2\">Failed to load schools.</div>');
+            }
+        });
+    }
+
+    function loadSchoolStudents(schoolId, container) {
+        currentSchoolPage[schoolId] = currentSchoolPage[schoolId] || 1;
+        $.ajax({
+            url: 'index.php?r=zone-coordinator/get-school-students',
+            type: 'GET',
+            data: { school_id: schoolId, page: currentSchoolPage[schoolId] },
+            beforeSend: function() {
+                container.html('<div class="text-center p-3">Loading students...</div>');
+            },
+            success: function(data) {
+                container.html('');
+                if (data.students && data.students.length > 0) {
+                    data.students.forEach(function(student) {
+                        container.append(generateStudentHtml(student));
+                    });
+                    if (data.hasMore) {
+                        container.append('<div class=\"text-center mt-2\"><button class=\"load-more-students\" data-school-id=\"' + schoolId + '\">Load More Students</button></div>');
+                    }
+                } else {
+                    container.html('<div class=\"text-muted p-2\">No students registered</div>');
+                }
+            },
+            error: function() {
+                container.html('<div class=\"alert alert-danger p-2\">Failed to load students.</div>');
+            }
+        });
+    }
+
+    // Handle load more schools
+    $(document).on('click', '.load-more-btn[data-zone-id]', function() {
+        var zoneId = $(this).data('zone-id');
+        currentZonePage[zoneId] = (currentZonePage[zoneId] || 1) + 1;
+        var container = $(this).closest('.collapse-content');
+        $(this).parent().remove();
+        loadZoneSchools(zoneId, container);
+    });
+
+    // Handle load more students
+    $(document).on('click', '.load-more-students', function() {
+        var schoolId = $(this).data('school-id');
+        currentSchoolPage[schoolId] = (currentSchoolPage[schoolId] || 1) + 1;
+        var container = $(this).closest('.student-list');
+        $(this).parent().remove();
+        loadSchoolStudents(schoolId, container);
+    });
+
+    // Generate school HTML - using a list style for better visibility
+    function generateSchoolHtml(schoolInfo, zoneId) {
+        return '<div class=\"school-list-item mb-2\">' +
+            '<div class=\"school-card border rounded p-3 bg-light\" role=\"button\" tabindex=\"0\" data-zone-id=\"' + zoneId + '\" data-school-id=\"' + schoolInfo.school.school_id + '\">' +
+                '<div class=\"d-flex justify-content-between align-items-center\">' +
+                    '<div class=\"school-info\">' +
+                        '<div class=\"school-title fw-bold text-primary\">' +
+
+                            escapeHtml(schoolInfo.school.school_name) +
+                        '</div>' +
+                        '<div class=\"school-stats text-muted small mt-1\">' +
+                            schoolInfo.studentCount + ' students' +
+                        '</div>' +
+                    '</div>' +
+
+                '</div>' +
+                '<div class="student-list mt-3" style="max-height: 300px; overflow-y: auto;">' +
+                    '<div class=\"student-container\"></div>' +
+                '</div>' +
+            '</div>' +
+        '</div>';
+    }
+
+    // Generate student HTML
+    function generateStudentHtml(student) {
+        var fullName = escapeHtml(student.other_name + ' ' + student.surname);
+        var regNo = escapeHtml(student.student_reg_no);
+        var phone = student.phone_no ? escapeHtml(student.phone_no) : 'N/A';
+        var email = student.email ? escapeHtml(student.email) : 'N/A';
+
+        var detailsHtml = '';
+
+        if (phone !== 'N/A') {
+            detailsHtml += '<span class="student-detail-item">' + phone + '</span>';
+        }
+
+        if (email !== 'N/A') {
+            detailsHtml += '<span class="student-detail-item">' + email + '</span>';
+        }
+
+        var supervisorName = student.supervisorName ? escapeHtml(student.supervisorName) : 'Unassigned';
+        var supervisorEmail = student.supervisorEmail ? escapeHtml(student.supervisorEmail) : null;
+        var supervisorPhone = student.supervisorPhone ? escapeHtml(student.supervisorPhone) : null;
+        var supervisorHtml = '<div class="student-supervisor">' +
+            '<strong>Supervisor:</strong> ' + supervisorName +
+        '</div>';
+        if (supervisorEmail) {
+            supervisorHtml += '<div class="student-supervisor-contact text-muted"><i class="fas fa-envelope me-1"></i>' + supervisorEmail + '</div>';
+        }
+        if (supervisorPhone) {
+            supervisorHtml += '<div class="student-supervisor-contact text-muted"><i class="fas fa-phone me-1"></i>' + supervisorPhone + '</div>';
+        }
+
+        return '<a href="' + studentViewUrl + '?student_reg_no=' + encodeURIComponent(regNo) + '" class="student-item" data-student-reg-no="' + regNo + '">' +
+            '<div class="student-header">' +
+                '<span class="student-name">' +
+                    fullName +
+                '</span>' +
+                '<span class="student-reg-no">Reg: ' + regNo + '</span>' +
+            '</div>' +
+            (detailsHtml ? '<div class="student-details">' + detailsHtml + '</div>' : '') +
+            '<div class="student-supervisor-section">' + supervisorHtml + '</div>' +
+        '</a>';
+    }
+
+    // Escape HTML helper
+    function escapeHtml(text) {
+        return text.replace(/[&<>\"']/g, function(m) {
+            switch (m) {
+                case '&':
+                    return '&amp;';
+                case '<':
+                    return '&lt;';
+                case '>':
+                    return '&gt;';
+                case '"':
+                    return '&quot;';
+                case "'":
+                    return '&#039;';
+                default:
+                    return m;
+            }
+        });
+    }
+
     // Start polling
     setInterval(updateZoneCoordinatorProfile, updateInterval);
 
     // Initial update after 5 seconds
     setTimeout(updateZoneCoordinatorProfile, 5000);
-", \yii\web\View::POS_READY);
+JS, \yii\web\View::POS_READY);
 ?>
-
-<style>
-    .workflow-steps .step-box {
-        padding: 20px;
-        margin: 10px 0;
-        border-radius: 8px;
-        background: #f8f9fa;
-        border: 2px solid #dee2e6;
-        transition: all 0.3s ease;
-    }
-
-    .workflow-steps .step-box.active {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        border-color: #667eea;
-        transform: translateY(-2px);
-        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
-    }
-
-    .workflow-steps .step-number {
-        width: 40px;
-        height: 40px;
-        border-radius: 50%;
-        background: #fff;
-        color: #333;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-weight: bold;
-        font-size: 18px;
-        margin: 0 auto 10px;
-        border: 2px solid #dee2e6;
-    }
-
-    .workflow-steps .step-box.active .step-number {
-        background: #667eea;
-        color: white;
-        border-color: #667eea;
-    }
-
-    .workflow-steps h6 {
-        margin-bottom: 8px;
-        font-weight: 600;
-    }
-
-    .border-left-primary {
-        border-left: 4px solid #007bff !important;
-    }
-
-    .border-left-warning {
-        border-left: 4px solid #ffc107 !important;
-    }
-
-    .border-left-success {
-        border-left: 4px solid #28a745 !important;
-    }
-
-    .border-left-secondary {
-        border-left: 4px solid #6c757d !important;
-    }
-</style>
 
 <div class="zone-coordinator-profile">
     <div class="container-fluid mt-4">
         <!-- Quick Actions -->
         <div class="actions-row">
-            <a href="<?= Url::to(['/zone-coordinator/profile']) ?>" class="action-card">
-                <div class="action-title">Dashboard</div>
-                <div class="action-button">MY DASHBOARD</div>
+            <a href="<?= Url::to(['zone-coordinator/manage-zones']) ?>" class="action-card">
+                <div class="action-title">Zone Management</div>
+                <div class="action-button">MY ZONES</div>
             </a>
-            <a href="<?= Url::to(['/assessment/index']) ?>" class="action-card">
+            <a href="#assessments" class="action-card">
                 <div class="action-title">Assessment Review</div>
-                <div class="action-button">ASSESSMENTS</div>
+                <div class="action-button">VALIDATE ASSESSMENTS</div>
             </a>
         </div>
 
         <!-- Profile Header -->
         <div class="row mb-4">
             <div class="col-md-12">
-                <div class="card border-left-info shadow">
+                <div class="card border-left-primary shadow">
                     <div class="card-body">
                         <div class="row align-items-center">
                             <div class="col-md-8">
                                 <h2 class="mb-2">
-                                    <i class="fas fa-user-check text-info"></i> 
-                                    <?= Html::encode($coordinator ? $coordinator->name : 'Unknown') ?>
+                                    <?= Html::encode($coordinator->name) ?>
                                 </h2>
                                 <p class="text-muted mb-1">
-                                    <strong>Role:</strong> <?= Html::encode($role && is_object($role) ? $role->role_name : 'Zone Coordinator') ?>
+                                    <strong>Role:</strong> <?= Html::encode($role ? $role->role_name : 'N/A') ?>
                                 </p>
                                 <p class="text-muted mb-1">
-                                    <strong>Status:</strong> 
+                                    <strong>Status:</strong>
                                     <span class="badge badge-success">
-                                        <?= Html::encode($coordinator && is_object($coordinator) ? $coordinator->status : 'Active') ?>
+                                        <?= Html::encode($coordinator->status) ?>
                                     </span>
                                 </p>
                             </div>
                             <div class="col-md-4 text-right">
-                                <?= Html::a(
-                                    '<i class="fas fa-list"></i> View Assessments',
-                                    ['/assessment/index'],
-                                    ['class' => 'btn btn-primary me-2']
-                                ) ?>
-                                <?= Html::a(
-                                    '<i class="fas fa-edit"></i> Edit Profile',
-                                    ['edit'],
-                                    ['class' => 'btn btn-secondary']
-                                ) ?>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Contact Information -->
-        <div class="row mb-4">
-            <div class="col-md-6">
-                <div class="card">
-                    <div class="card-header bg-info text-white">
-                        <h5 class="mb-0"><i class="fas fa-address-card"></i> Contact Information</h5>
-                    </div>
-                    <div class="card-body">
-                        <table class="table table-sm">
-                            <tbody>
-                                <tr>
-                                    <td><strong>Payroll No:</strong></td>
-                                    <td><?= Html::encode($coordinator && is_object($coordinator) ? $coordinator->payroll_no ?? 'N/A' : 'N/A') ?></td>
-                                </tr>
-                                <tr>
-                                    <td><strong>Username:</strong></td>
-                                    <td><?= Html::encode($coordinator && is_object($coordinator) ? $coordinator->username : 'N/A') ?></td>
-                                </tr>
-                                <tr>
-                                    <td><strong>Phone:</strong></td>
-                                    <td><?= Html::encode($coordinator && is_object($coordinator) ? $coordinator->phone ?? 'N/A' : 'N/A') ?></td>
-                                </tr>
-                                <tr>
-                                    <td><strong>User ID:</strong></td>
-                                    <td><?= $coordinator && is_object($coordinator) ? $coordinator->user_id : 'N/A' ?></td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Assessment Statistics -->
-            <div class="col-md-6">
-                <div class="card">
-                    <div class="card-header bg-info text-white">
-                        <h5 class="mb-0"><i class="fas fa-chart-bar"></i> Review Statistics</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="row text-center mb-3">
-                            <div class="col-md-6 mb-3">
-                                <div class="stat-box">
-                                    <h3 class="text-info mb-0"><?= $totalAssessments ?></h3>
-                                    <p class="text-muted mb-0">Total Assessments</p>
-                                </div>
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <div class="stat-box">
-                                    <h3 class="text-success mb-0"><?= $validatedAssessments ?></h3>
-                                    <p class="text-muted mb-0">Validated</p>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="row text-center">
-                            <div class="col-md-6 mb-3">
-                                <div class="stat-box">
-                                    <h3 class="text-warning mb-0"><?= $pendingValidation ?></h3>
-                                    <p class="text-muted mb-0">Pending Validation</p>
-                                </div>
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <div class="stat-box">
-                                    <h3 class="text-secondary mb-0"><?= $schoolCount ?></h3>
-                                    <p class="text-muted mb-0">Schools</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Systematic Assessment Workflow -->
-        <div class="row mb-4">
-            <div class="col-md-12">
-                <div class="card">
-                    <div class="card-header bg-info text-white">
-                        <h5 class="mb-0"><i class="fas fa-tasks"></i> Assessment Review Workflow</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="workflow-steps mb-4">
-                            <div class="row text-center">
-                                <div class="col-md-4">
-                                    <div class="step-box step-1 active">
-                                        <div class="step-number">1</div>
-                                        <h6>Review Assessment Reports</h6>
-                                        <p class="small">Examine submitted assessments for completeness and accuracy</p>
+                                <div class="d-flex justify-content-end gap-2">
+                                    <div class="stat-box text-center me-3">
+                                        <h3 class="text-primary mb-0"><?= $totalAssessments ?></h3>
+                                        <p class="text-muted small mb-0">Total Assessments</p>
                                     </div>
-                                </div>
-                                <div class="col-md-4">
-                                    <div class="step-box step-2">
-                                        <div class="step-number">2</div>
-                                        <h6>Edit Assessment Reports</h6>
-                                        <p class="small">Make corrections and updates to assessment details</p>
+                                    <div class="stat-box text-center me-3">
+                                        <h3 class="text-success mb-0"><?= $validatedAssessments ?></h3>
+                                        <p class="text-muted small mb-0">Validated</p>
                                     </div>
-                                </div>
-                                <div class="col-md-4">
-                                    <div class="step-box step-3">
-                                        <div class="step-number">3</div>
-                                        <h6>Validate Assessment Reports</h6>
-                                        <p class="small">Final approval and validation of completed assessments</p>
+                                    <div class="stat-box text-center">
+                                        <h3 class="text-warning mb-0"><?= $pendingValidation ?></h3>
+                                        <p class="text-muted small mb-0">Pending</p>
                                     </div>
                                 </div>
                             </div>
@@ -317,258 +548,156 @@ $this->registerJs("
             </div>
         </div>
 
-        <!-- Quick Actions -->
-        <div class="row mb-4">
-            <div class="col-md-12">
-                <div class="card">
-                    <div class="card-header bg-info text-white">
-                        <h5 class="mb-0"><i class="fas fa-bolt"></i> Quick Actions</h5>
+        <!-- Assigned Zones Section -->
+        <div id="assigned-zones" class="row mb-4">
+            <div class="col-12">
+                <div class="card shadow">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">
+                            My Assigned Zones
+                        </h5>
                     </div>
                     <div class="card-body">
-                        <div class="btn-group-vertical w-100">
-                            <?= Html::a('<i class="fas fa-search"></i> Review All Assessments', ['/assessment/index'], ['class' => 'btn btn-outline-info mb-2 text-left']) ?>
-                            <?= Html::a('<i class="fas fa-list"></i> Pending Validation', ['/assessment/index', 'AssessmentSearch' => ['overall_level' => '']], ['class' => 'btn btn-outline-info mb-2 text-left']) ?>
-                            <?= Html::a('<i class="fas fa-poll"></i> View Dashboard', ['/site/dashboard'], ['class' => 'btn btn-outline-info text-left']) ?>
-                            <?= Html::a('<i class="fas fa-check-double"></i> Validate All Pending', ['validate-all'], ['class' => 'btn btn-success mb-0', 'data-confirm' => 'Are you sure you want to validate all pending assessments at once?', 'data-method' => 'post']) ?>
+                        <?php if (empty($zoneData)): ?>
+                            <div class="alert alert-warning">
+                                No zones are currently assigned to you. Please contact the TP Office for zone assignment.
+                            </div>
+                        <?php else: ?>
+                        <div class="mb-3">
+                            <label for="assigned-zone-select" class="form-label fw-bold">Select Assigned Zone</label>
+                            <select id="assigned-zone-select" class="form-select form-select-lg">
+                                <option value="">Choose a zone...</option>
+                                <?php foreach ($zoneData as $zoneInfo): ?>
+                                    <?php $firstSchoolId = isset($zoneInfo['schools'][0]['school']) ? $zoneInfo['schools'][0]['school']->school_id : null; ?>
+                                    <option value="<?= $zoneInfo['zone']->zone_id ?>" data-first-school-id="<?= $firstSchoolId ?>">
+                                        <?= Html::encode($zoneInfo['zone']->zone_name . ' (' . $zoneInfo['schoolCount'] . ' schools, ' . $zoneInfo['totalStudents'] . ' students)') ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
                         </div>
+                    <?php endif; ?>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- STEP 1: Review Assessment Reports -->
-        <div class="row mb-4">
-            <div class="col-md-12">
-                <div class="card border-left-primary">
-                    <div class="card-header bg-light">
-                        <h5 class="mb-0"><i class="fas fa-search text-primary"></i> Pending Reviews</h5>
-                        <small class="text-muted">Assessments submitted and awaiting your review</small>
+        <!-- Assessment Validation Section -->
+        <div id="assessments" class="row">
+            <div class="col-12">
+                <div class="card shadow">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0">
+                            Assessment Validation
+                        </h5>
                     </div>
                     <div class="card-body">
-                        <?php if (count($submittedAssessments) > 0): ?>
-                            <div class="table-responsive">
-                                <table class="table table-hover">
-                                    <thead class="table-light">
-                                        <tr>
-                                            <th>Student</th>
-                                            <th>School</th>
-                                            <th>Date Submitted</th>
-                                            <th>Examiner</th>
-                                            <th>Status</th>
-                                            <th>Action</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <?php foreach ($submittedAssessments as $assessment): ?>
+                        <!-- Pending Assessments for Validation -->
+                        <?php if (!empty($submittedAssessments)): ?>
+                            <div class="mb-4">
+                                <h6 class="text-warning mb-3">
+                                    Pending Validation (<?= count($submittedAssessments) ?>)
+                                </h6>
+                                <div class="table-responsive">
+                                    <table class="table table-hover">
+                                        <thead>
                                             <tr>
-                                                <td><strong><?= Html::encode($assessment->student_reg_no) ?></strong></td>
-                                                <td><?= Html::encode($assessment->school ? $assessment->school->school_name : 'N/A') ?></td>
-                                                <td><?= Html::encode($assessment->assessment_date) ?></td>
-                                                <td><?= Html::encode($assessment->examinerUser ? $assessment->examinerUser->name : 'N/A') ?></td>
-                                                <td>
-                                                    <?php if ($assessment->overall_level): ?>
-                                                        <span class="badge badge-info">Complete</span>
-                                                    <?php else: ?>
-                                                        <span class="badge badge-warning">Incomplete</span>
-                                                    <?php endif; ?>
-                                                </td>
-                                                <td>
-                                                    <?= Html::a('<i class="fas fa-eye"></i> Review', ['review-assessment', 'assessment_id' => $assessment->assessment_id], ['class' => 'btn btn-primary']) ?>
-                                                </td>
+                                                <th>Student</th>
+                                                <th>Supervisor</th>
+                                                <th>School</th>
+                                                <th>Date</th>
+                                                <th>Action</th>
                                             </tr>
-                                        <?php endforeach; ?>
-                                    </tbody>
-                                </table>
-                            </div>
-                        <?php else: ?>
-                            <div class="text-center text-muted py-3">
-                                <i class="fas fa-check-circle fa-2x text-success mb-2"></i>
-                                <p>No assessments currently need review.</p>
+                                        </thead>
+                                        <tbody>
+                                            <?php foreach ($submittedAssessments as $assessment): ?>
+                                                <tr>
+                                                    <td>
+                                                        <strong><?= Html::encode($assessment->student_reg_no) ?></strong>
+                                                        <?php if ($assessment->student): ?>
+                                                            <br><small class="text-muted"><?= Html::encode($assessment->student->other_name . ' ' . $assessment->student->surname) ?></small>
+                                                        <?php endif; ?>
+                                                    </td>
+                                                    <td>
+                                                        <?php if ($assessment->examinerUser): ?>
+                                                            <?= Html::encode($assessment->examinerUser->name) ?>
+                                                        <?php endif; ?>
+                                                    </td>
+                                                    <td>
+                                                        <?php if ($assessment->school): ?>
+                                                            <?= Html::encode($assessment->school->school_name) ?>
+                                                        <?php endif; ?>
+                                                    </td>
+                                                    <td><?= \Yii::$app->formatter->asDate($assessment->assessment_date) ?></td>
+                                                    <td>
+                                                        <?= Html::a('Review & Validate', ['review-assessment', 'assessment_id' => $assessment->assessment_id], [
+                                                            'class' => 'btn btn-primary btn-sm'
+                                                        ]) ?>
+                                                    </td>
+                                                </tr>
+                                            <?php endforeach; ?>
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
                         <?php endif; ?>
-                    </div>
-                </div>
-            </div>
-        </div>
 
-        <!-- STEP 2: Edit Assessment Reports -->
-        <div class="row mb-4">
-            <div class="col-md-12">
-                <div class="card border-left-warning">
-                    <div class="card-header bg-light">
-                        <h5 class="mb-0"><i class="fas fa-edit text-warning"></i> Pending Edits</h5>
-                        <small class="text-muted">Assessments that require corrections or updates</small>
-                    </div>
-                    <div class="card-body">
-                        <?php if (count($submittedAssessments) > 0): ?>
-                            <div class="table-responsive">
-                                <table class="table table-hover">
-                                    <thead class="table-light">
-                                        <tr>
-                                            <th>Student</th>
-                                            <th>School</th>
-                                            <th>Date Submitted</th>
-                                            <th>Examiner</th>
-                                            <th>Status</th>
-                                            <th>Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <?php foreach ($submittedAssessments as $assessment): ?>
+                        <!-- Recently Validated -->
+                        <?php if (!empty($recentlyValidated)): ?>
+                            <div>
+                                <h6 class="text-success mb-3">
+                                    Recently Validated (<?= count($recentlyValidated) ?>)
+                                </h6>
+                                <div class="table-responsive">
+                                    <table class="table table-hover">
+                                        <thead>
                                             <tr>
-                                                <td><strong><?= Html::encode($assessment->student_reg_no) ?></strong></td>
-                                                <td><?= Html::encode($assessment->school ? $assessment->school->school_name : 'N/A') ?></td>
-                                                <td><?= Html::encode($assessment->assessment_date) ?></td>
-                                                <td><?= Html::encode($assessment->examinerUser ? $assessment->examinerUser->name : 'N/A') ?></td>
-                                                <td>
-                                                    <?php if ($assessment->overall_level): ?>
-                                                        <span class="badge badge-info">Complete</span>
-                                                    <?php else: ?>
-                                                        <span class="badge badge-warning">Incomplete</span>
-                                                    <?php endif; ?>
-                                                </td>
-                                                <td>
-                                                    <div class="btn-group btn-group-sm">
-                                                        <?= Html::a('<i class="fas fa-eye"></i> Review', ['review-assessment', 'assessment_id' => $assessment->assessment_id], ['class' => 'btn btn-info me-1']) ?>
-                                                        <?= Html::a('<i class="fas fa-edit"></i> Edit', ['edit-assessment', 'assessment_id' => $assessment->assessment_id], ['class' => 'btn btn-warning']) ?>
-                                                    </div>
-                                                </td>
+                                                <th>Student</th>
+                                                <th>School</th>
+                                                <th>Date Validated</th>
+                                                <th>Final Score</th>
+                                                <th>Final Level</th>
+                                                <th>Status</th>
                                             </tr>
-                                        <?php endforeach; ?>
-                                    </tbody>
-                                </table>
-                            </div>
-                        <?php else: ?>
-                            <div class="text-center text-muted py-3">
-                                <i class="fas fa-edit fa-2x text-muted mb-2"></i>
-                                <p>No assessments currently available for editing.</p>
-                            </div>
-                        <?php endif; ?>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- STEP 3: Validate Assessment Reports -->
-        <div class="row mb-4">
-            <div class="col-md-12">
-                <div class="card border-left-success">
-                    <div class="card-header bg-light">
-                        <h5 class="mb-0"><i class="fas fa-check-circle text-success"></i> Ready for Validation</h5>
-                        <small class="text-muted">Completed assessments awaiting final approval</small>
-                    </div>
-                    <div class="card-body">
-                        <?php
-                        $completeAssessments = array_filter($submittedAssessments, function($assessment) {
-                            return $assessment->overall_level !== null && $assessment->validated_by === null;
-                        });
-                        ?>
-                        <?php if (count($completeAssessments) > 0): ?>
-                            <div class="table-responsive">
-                                <table class="table table-hover">
-                                    <thead class="table-light">
-                                        <tr>
-                                            <th>Student</th>
-                                            <th>School</th>
-                                            <th>Date Submitted</th>
-                                            <th>Examiner</th>
-                                            <th>Score</th>
-                                            <th>Level</th>
-                                            <th>Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <?php foreach ($completeAssessments as $assessment): ?>
-                                            <tr>
-                                                <td><strong><?= Html::encode($assessment->student_reg_no) ?></strong></td>
-                                                <td><?= Html::encode($assessment->school ? $assessment->school->school_name : 'N/A') ?></td>
-                                                <td><?= Html::encode($assessment->assessment_date) ?></td>
-                                                <td><?= Html::encode($assessment->examinerUser ? $assessment->examinerUser->name : 'N/A') ?></td>
-                                                <td><strong><?= $assessment->total_score ?>/100</strong></td>
-                                                <td>
-                                                    <?php
-                                                    $badges = [
-                                                        'BE' => '<span class="badge bg-danger">BE</span>',
-                                                        'AE' => '<span class="badge bg-warning text-dark">AE</span>',
-                                                        'ME' => '<span class="badge bg-info">ME</span>',
-                                                        'EE' => '<span class="badge bg-success">EE</span>'
-                                                    ];
-                                                    echo $badges[$assessment->overall_level] ?? '<span class="badge bg-secondary">N/A</span>';
-                                                    ?>
-                                                </td>
-                                                <td>
-                                                    <div class="btn-group btn-group-sm">
-                                                        <?= Html::a('<i class="fas fa-eye"></i> Review', ['review-assessment', 'assessment_id' => $assessment->assessment_id], ['class' => 'btn btn-info me-1']) ?>
-                                                        <?= Html::a('<i class="fas fa-edit"></i> Edit', ['edit-assessment', 'assessment_id' => $assessment->assessment_id], ['class' => 'btn btn-warning me-1']) ?>
-                                                        <?= Html::a('<i class="fas fa-check-circle"></i> Validate', ['validate-assessment', 'assessment_id' => $assessment->assessment_id], ['class' => 'btn btn-success']) ?>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        <?php endforeach; ?>
-                                    </tbody>
-                                </table>
-                            </div>
-                        <?php else: ?>
-                            <div class="text-center text-muted py-3">
-                                <i class="fas fa-clock fa-2x text-muted mb-2"></i>
-                                <p>No completed assessments ready for validation yet.</p>
-                            </div>
-                        <?php endif; ?>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Validated Assessments Summary -->
-        <div class="row">
-            <div class="col-md-12">
-                <div class="card border-left-secondary">
-                    <div class="card-header bg-light">
-                        <h5 class="mb-0"><i class="fas fa-check-double text-success"></i> ✅ Validated Assessments</h5>
-                        <small class="text-muted">Assessments you have reviewed and validated</small>
-                    </div>
-                    <div class="card-body">
-                        <?php if (count($recentlyValidated) > 0): ?>
-                            <div class="table-responsive">
-                                <table class="table table-hover">
-                                    <thead class="table-light">
-                                        <tr>
-                                            <th>Student</th>
-                                            <th>School</th>
-                                            <th>Date Validated</th>
-                                            <th>Final Score</th>
-                                            <th>Final Level</th>
-                                            <th>Status</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <?php foreach ($recentlyValidated as $assessment): ?>
-                                            <tr>
-                                                <td><strong><?= Html::encode($assessment->student_reg_no) ?></strong></td>
-                                                <td><?= Html::encode($assessment->school ? $assessment->school->school_name : 'N/A') ?></td>
-                                                <td><?= Html::encode($assessment->validated_at ? date('Y-m-d', strtotime($assessment->validated_at)) : 'N/A') ?></td>
-                                                <td><strong><?= $assessment->total_score ?>/100</strong></td>
-                                                <td>
-                                                    <?php
-                                                    $badges = [
-                                                        'BE' => '<span class="badge bg-danger">BE</span>',
-                                                        'AE' => '<span class="badge bg-warning text-dark">AE</span>',
-                                                        'ME' => '<span class="badge bg-info">ME</span>',
-                                                        'EE' => '<span class="badge bg-success">EE</span>'
-                                                    ];
-                                                    echo $badges[$assessment->overall_level] ?? '<span class="badge bg-secondary">N/A</span>';
-                                                    ?>
-                                                </td>
-                                                <td><span class="badge badge-success">Validated</span></td>
-                                            </tr>
-                                        <?php endforeach; ?>
-                                    </tbody>
-                                </table>
-                            </div>
-                        <?php else: ?>
-                            <div class="text-center text-muted py-3">
-                                <i class="fas fa-clock fa-2x text-muted mb-2"></i>
-                                <p>No assessments validated yet.</p>
+                                        </thead>
+                                        <tbody>
+                                            <?php foreach ($recentlyValidated as $assessment): ?>
+                                                <tr>
+                                                    <td>
+                                                        <strong><?= Html::encode($assessment->student_reg_no) ?></strong>
+                                                        <?php if ($assessment->student): ?>
+                                                            <br><small class="text-muted"><?= Html::encode($assessment->student->other_name . ' ' . $assessment->student->surname) ?></small>
+                                                        <?php endif; ?>
+                                                    </td>
+                                                    <td>
+                                                        <?php if ($assessment->school): ?>
+                                                            <?= Html::encode($assessment->school->school_name) ?>
+                                                        <?php endif; ?>
+                                                    </td>
+                                                    <td><?= \Yii::$app->formatter->asDate($assessment->validated_at) ?></td>
+                                                    <td>
+                                                        <?php
+                                                        $totalScore = 0;
+                                                        if ($assessment->grades) {
+                                                            foreach ($assessment->grades as $grade) {
+                                                                $totalScore += $grade->score ?? 0;
+                                                            }
+                                                        }
+                                                        echo $totalScore . '/100';
+                                                        ?>
+                                                    </td>
+                                                    <td>
+                                                        <span class="badge bg-secondary">
+                                                            <?= Html::encode($assessment->overall_level ?? 'N/A') ?>
+                                                        </span>
+                                                    </td>
+                                                    <td>
+                                                        <span class="badge bg-success">Validated</span>
+                                                    </td>
+                                                </tr>
+                                            <?php endforeach; ?>
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
                         <?php endif; ?>
                     </div>

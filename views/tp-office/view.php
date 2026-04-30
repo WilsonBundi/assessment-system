@@ -31,15 +31,20 @@ $this->params['breadcrumbs'][] = $this->title;
     <?= DetailView::widget([
         'model' => $model,
         'attributes' => [
-            'assessment_id',
+            [
+                'attribute' => 'assessment_id',
+                'label' => 'Assessment',
+            ],
             'student_reg_no',
             [
                 'attribute' => 'school_id',
+                'label' => 'School',
                 'value' => $model->school ? $model->school->school_name : 'N/A',
             ],
             'assessment_date',
             [
                 'attribute' => 'examiner_user_id',
+                'label' => 'Examiner',
                 'value' => $model->examinerUser ? $model->examinerUser->name : 'N/A',
             ],
             'start_time',
@@ -48,6 +53,7 @@ $this->params['breadcrumbs'][] = $this->title;
             'overall_level',
             [
                 'attribute' => 'learning_area_id',
+                'label' => 'Learning Area',
                 'value' => $model->learningArea ? $model->learningArea->learning_area_name : 'N/A',
             ],
         ],

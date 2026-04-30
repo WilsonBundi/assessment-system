@@ -72,6 +72,8 @@ $this->params['breadcrumbs'][] = $this->title;
                                         <tr>
                                             <th class="fw-bold">Student ID</th>
                                             <th class="fw-bold">Student Name</th>
+                                            <th class="fw-bold">Phone</th>
+                                            <th class="fw-bold">Email</th>
                                             <th class="fw-bold">Zone</th>
                                             <th class="fw-bold">Status</th>
                                             <th class="fw-bold">Action</th>
@@ -84,6 +86,8 @@ $this->params['breadcrumbs'][] = $this->title;
                                                     <strong><?= Html::encode($student->student_reg_no) ?></strong>
                                                 </td>
                                                 <td><?= Html::encode($student->getName()) ?></td>
+                                                <td><?= Html::encode($student->phone_no ?: 'N/A') ?></td>
+                                                <td><?= Html::encode($student->email ?: 'N/A') ?></td>
                                                 <td>
                                                     <span class="badge bg-secondary">
                                                         <?php 

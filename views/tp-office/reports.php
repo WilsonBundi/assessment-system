@@ -50,10 +50,32 @@ $this->params['breadcrumbs'][] = $this->title;
             'columns' => [
                 ['class' => 'yii\grid\SerialColumn'],
 
-                'assessment_id',
+                [
+                    'attribute' => 'assessment_id',
+                    'label' => 'Assessment',
+                ],
                 'student_reg_no',
                 [
+                    'label' => 'Student Name',
+                    'value' => function ($model) {
+                        return $model->student ? $model->student->getName() : 'N/A';
+                    },
+                ],
+                [
+                    'label' => 'Student Phone',
+                    'value' => function ($model) {
+                        return $model->student ? ($model->student->phone_no ?: 'N/A') : 'N/A';
+                    },
+                ],
+                [
+                    'label' => 'Student Email',
+                    'value' => function ($model) {
+                        return $model->student ? ($model->student->email ?: 'N/A') : 'N/A';
+                    },
+                ],
+                [
                     'attribute' => 'school_id',
+                    'label' => 'School',
                     'value' => function ($model) {
                         return $model->school->school_name ?? 'N/A';
                     },
@@ -61,6 +83,7 @@ $this->params['breadcrumbs'][] = $this->title;
                 'assessment_date',
                 [
                     'attribute' => 'examiner_user_id',
+                    'label' => 'Examiner',
                     'value' => function ($model) {
                         return $model->examinerUser->name ?? 'N/A';
                     },

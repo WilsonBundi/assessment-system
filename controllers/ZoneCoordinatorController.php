@@ -7,6 +7,7 @@ use app\models\Users;
 use app\models\Assessment;
 use app\models\AssessmentSearch;
 use app\models\School;
+use app\models\StudentSupervisorAssignment;
 use yii\web\Controller;
 use yii\filters\AccessControl;
 use yii\filters\VerbFilter;
@@ -42,13 +43,18 @@ class ZoneCoordinatorController extends Controller
                     'profile' => ['GET', 'POST'],
                     'edit' => ['GET', 'POST'],
                     'validate-all' => ['POST'],
+                    'get-zone-schools' => ['GET'],
+                    'get-school-students' => ['GET'],
+                    'get-profile-data' => ['GET'],
+                    'manage-zones' => ['GET'],
+                    'get-school-students-with-status' => ['GET'],
                 ],
             ],
         ];
     }
 
     /**
-     * Display zone coordinator profile
+     * Display zone coordinator profile with assigned zones, schools, and students
      */
     public function actionProfile()
     {
@@ -57,56 +63,117 @@ class ZoneCoordinatorController extends Controller
         // Get basic user info
         $coordinator = Users::findOne(['user_id' => $user->user_id]);
 
-        // Get assessment statistics for reviewed assessments
-        $totalAssessments = Assessment::find()
+        // Get zones assigned to this coordinator via the assignment table
+        $assignedZones = \app\models\Zone::find()
+            ->innerJoin('user_zones', 'user_zones.zone_id = zone.zone_id AND user_zones.user_id = :userId', [':userId' => $user->user_id])
+            ->all();
+
+        $assignedZoneIds = array_map(function($zone) {
+            return $zone->zone_id;
+        }, $assignedZones);
+
+        // Get all schools and students in assigned zones
+        $zoneData = [];
+        foreach ($assignedZones as $zone) {
+            $schools = \app\models\School::find()
+                ->where(['zone_id' => $zone->zone_id])
+                ->all();
+
+            $schoolData = [];
+            foreach ($schools as $school) {
+                $students = \app\models\Students::find()
+                    ->where(['school_id' => $school->school_id])
+                    ->all();
+
+                $schoolData[] = [
+                    'school' => $school,
+                    'students' => $students,
+                    'studentCount' => count($students)
+                ];
+            }
+
+            $zoneData[] = [
+                'zone' => $zone,
+                'schools' => $schoolData,
+                'schoolCount' => count($schools),
+                'totalStudents' => array_sum(array_column($schoolData, 'studentCount'))
+            ];
+        }
+
+        // Get all supervisors with contact details
+        $supervisors = \app\models\Users::find()
+            ->where(['role_id' => 3]) // Supervisors
+            ->orderBy(['name' => SORT_ASC])
+            ->all();
+
+        // Get assessment statistics for reviewed assessments only in assigned zones
+        $zoneCondition = ['school.zone_id' => $assignedZoneIds ?: [0]];
+
+        $totalAssessments = \app\models\Assessment::find()
+            ->innerJoin('school', 'school.school_id = assessment.school_id')
+            ->andWhere($zoneCondition)
             ->andWhere(['or', ['archived' => 0], ['archived' => null]])
             ->count();
 
-        $pendingValidation = Assessment::find()
+        $pendingValidation = \app\models\Assessment::find()
+            ->innerJoin('school', 'school.school_id = assessment.school_id')
+            ->andWhere($zoneCondition)
             ->andWhere(['archived' => 1])
             ->andWhere(['is', 'validated_by', null]) // Submitted but not validated
             ->count();
 
-        $validatedAssessments = Assessment::find()
+        $validatedAssessments = \app\models\Assessment::find()
+            ->innerJoin('school', 'school.school_id = assessment.school_id')
+            ->andWhere($zoneCondition)
             ->andWhere(['is not', 'validated_by', null])
             ->count();
 
-        // Get unique schools being assessed
-        $schoolCount = Assessment::find()
-            ->select(['school_id'])
+        // Get unique schools being assessed within assigned zones
+        $schoolCount = \app\models\Assessment::find()
+            ->innerJoin('school', 'school.school_id = assessment.school_id')
+            ->andWhere($zoneCondition)
+            ->select(['school_id' => 'assessment.school_id'])
             ->distinct()
             ->count('DISTINCT school_id');
 
-        // Get unique students assessed across all supervisors
-        $uniqueStudents = Assessment::find()
-            ->select(['student_reg_no'])
+        // Get unique students assessed within assigned zones
+        $uniqueStudents = \app\models\Assessment::find()
+            ->innerJoin('school', 'school.school_id = assessment.school_id')
+            ->andWhere($zoneCondition)
+            ->select(['student_reg_no' => 'assessment.student_reg_no'])
             ->distinct()
             ->count('DISTINCT student_reg_no');
 
-// Get assessments for workflow display
-        $user = Yii::$app->user->identity;
-
-        // All submitted assessments for zone coordinator review
-        $submittedAssessments = Assessment::find()
+        // Get assessments for workflow display
+        // All submitted assessments for zone coordinator review in assigned zones
+        $submittedAssessments = \app\models\Assessment::find()
+            ->with(['student', 'examinerUser', 'school']) // Eager load relationships
+            ->innerJoin('school', 'school.school_id = assessment.school_id')
+            ->andWhere($zoneCondition)
             ->andWhere(['archived' => 1]) // Submitted
             ->andWhere(['is', 'validated_by', null]) // Not yet validated
             ->orderBy(['assessment_date' => SORT_DESC])
             ->limit(20)
             ->all();
 
-        // Recently validated assessments
-        $recentlyValidated = Assessment::find()
+        // Recently validated assessments within assigned zones
+        $recentlyValidated = \app\models\Assessment::find()
+            ->with(['student', 'examinerUser', 'school']) // Eager load relationships
+            ->innerJoin('school', 'school.school_id = assessment.school_id')
+            ->andWhere($zoneCondition)
             ->andWhere(['is not', 'validated_by', null]) // Has been validated
             ->orderBy(['validated_at' => SORT_DESC])
             ->limit(10)
             ->all();
 
-        // Setup search model for all assessments (coordinator reviews all)
+        // Setup search model for all assessments (coordinator reviews only assigned-zone assessments)
         $searchModel = new AssessmentSearch();
         $dataProvider = $searchModel->search(Yii::$app->request->queryParams);
 
-        // Order by date descending and limit
-        $dataProvider->query->orderBy(['assessment_date' => SORT_DESC])
+        // Filter results to assigned zones only
+        $dataProvider->query
+            ->andWhere($zoneCondition)
+            ->orderBy(['assessment_date' => SORT_DESC])
             ->andWhere(['or', ['archived' => 0], ['archived' => null]])
             ->limit(20);
 
@@ -118,6 +185,8 @@ class ZoneCoordinatorController extends Controller
         return $this->render('zone-coordinator-profile', [
             'coordinator' => $coordinator,
             'role' => $role,
+            'zoneData' => $zoneData,
+            'supervisors' => $supervisors,
             'totalAssessments' => $totalAssessments,
             'pendingValidation' => $pendingValidation,
             'validatedAssessments' => $validatedAssessments,
@@ -181,6 +250,16 @@ class ZoneCoordinatorController extends Controller
         $model = \app\models\Assessment::findOne($assessmentId);
         if (!$model) {
             throw new \yii\web\NotFoundHttpException('Assessment not found.');
+        }
+
+        if ($model->isCompleted) {
+            if ($this->request->isPost) {
+                Yii::$app->session->setFlash('warning', 'Assessment completed. Editing is not allowed.');
+            }
+
+            return $this->render('edit-assessment', [
+                'model' => $model,
+            ]);
         }
 
         // Zone coordinators can edit assessment details (but not evidence)
@@ -295,27 +374,48 @@ class ZoneCoordinatorController extends Controller
 
         $lastUpdate = Yii::$app->request->get('last_update', 0);
 
+        // Get assigned zones for the logged-in coordinator
+        $user = Yii::$app->user->identity;
+        $assignedZones = \app\models\Zone::find()
+            ->innerJoin('user_zones', 'user_zones.zone_id = zone.zone_id AND user_zones.user_id = :userId', [':userId' => $user->user_id])
+            ->all();
+        $assignedZoneIds = array_map(function($zone) {
+            return $zone->zone_id;
+        }, $assignedZones);
+
+        $zoneCondition = ['school.zone_id' => $assignedZoneIds ?: [0]];
+
         // Get current statistics
         $totalAssessments = Assessment::find()
+            ->innerJoin('school', 'school.school_id = assessment.school_id')
+            ->andWhere($zoneCondition)
             ->andWhere(['or', ['archived' => 0], ['archived' => null]])
             ->count();
 
         $pendingValidation = Assessment::find()
+            ->innerJoin('school', 'school.school_id = assessment.school_id')
+            ->andWhere($zoneCondition)
             ->andWhere(['archived' => 1])
             ->andWhere(['is', 'validated_by', null])
             ->count();
 
         $validatedAssessments = Assessment::find()
+            ->innerJoin('school', 'school.school_id = assessment.school_id')
+            ->andWhere($zoneCondition)
             ->andWhere(['is not', 'validated_by', null])
             ->count();
 
         $schoolCount = Assessment::find()
-            ->select(['school_id'])
+            ->innerJoin('school', 'school.school_id = assessment.school_id')
+            ->andWhere($zoneCondition)
+            ->select(['school_id' => 'assessment.school_id'])
             ->distinct()
             ->count('DISTINCT school_id');
 
         // Check for updates
         $newValidationsCount = Assessment::find()
+            ->innerJoin('school', 'school.school_id = assessment.school_id')
+            ->andWhere($zoneCondition)
             ->andWhere(['is not', 'validated_by', null])
             ->andWhere(['>', 'validated_at', date('Y-m-d H:i:s', $lastUpdate/1000)])
             ->count();
@@ -329,6 +429,332 @@ class ZoneCoordinatorController extends Controller
             'validatedAssessments' => $validatedAssessments,
             'schoolCount' => $schoolCount,
             'timestamp' => time() * 1000
+        ];
+    }
+
+    /**
+     * Get schools for a specific zone (AJAX with pagination)
+     */
+    public function actionGetZoneSchools()
+    {
+        if (!Yii::$app->user->identity || Yii::$app->user->identity->role_id != 2) {
+            throw new \yii\web\ForbiddenHttpException('Access denied.');
+        }
+
+        Yii::$app->response->format = \yii\web\Response::FORMAT_JSON;
+
+        $zoneId = Yii::$app->request->get('zone_id');
+        $page = (int) Yii::$app->request->get('page', 1);
+        $perPage = 12; // Show 12 schools per page
+
+        if (!$zoneId) {
+            return ['error' => 'Zone ID is required'];
+        }
+
+        // Verify zone is assigned to this coordinator
+        $user = Yii::$app->user->identity;
+        $isAssigned = \app\models\Zone::find()
+            ->innerJoin('user_zones', 'user_zones.zone_id = zone.zone_id AND user_zones.user_id = :userId', [':userId' => $user->user_id])
+            ->andWhere(['zone.zone_id' => $zoneId])
+            ->exists();
+
+        if (!$isAssigned) {
+            return ['error' => 'Access denied to this zone'];
+        }
+
+        $offset = ($page - 1) * $perPage;
+
+        // Get schools with pagination
+        $schools = \app\models\School::find()
+            ->where(['zone_id' => $zoneId])
+            ->orderBy(['school_name' => SORT_ASC])
+            ->offset($offset)
+            ->limit($perPage + 1) // Get one extra to check if there are more
+            ->all();
+
+        $hasMore = count($schools) > $perPage;
+        if ($hasMore) {
+            array_pop($schools); // Remove the extra item
+        }
+
+        $schoolData = [];
+        foreach ($schools as $school) {
+            $studentCount = \app\models\Students::find()
+                ->where(['school_id' => $school->school_id])
+                ->count();
+
+            $schoolData[] = [
+                'school' => [
+                    'school_id' => $school->school_id,
+                    'school_name' => $school->school_name,
+                    'zone_id' => $school->zone_id,
+                ],
+                'studentCount' => $studentCount
+            ];
+        }
+
+        return [
+            'schools' => $schoolData,
+            'hasMore' => $hasMore,
+            'page' => $page,
+            'perPage' => $perPage
+        ];
+    }
+
+    /**
+     * Get students for a specific school (AJAX with pagination)
+     */
+    public function actionGetSchoolStudents()
+    {
+        if (!Yii::$app->user->identity || Yii::$app->user->identity->role_id != 2) {
+            throw new \yii\web\ForbiddenHttpException('Access denied.');
+        }
+
+        Yii::$app->response->format = \yii\web\Response::FORMAT_JSON;
+
+        $schoolId = Yii::$app->request->get('school_id');
+        $page = (int) Yii::$app->request->get('page', 1);
+        $perPage = 20; // Show 20 students per page
+
+        if (!$schoolId) {
+            return ['error' => 'School ID is required'];
+        }
+
+        // Verify school is in a zone assigned to this coordinator
+        $user = Yii::$app->user->identity;
+        $isAssigned = \app\models\School::find()
+            ->innerJoin('zone', 'zone.zone_id = school.zone_id')
+            ->innerJoin('user_zones', 'user_zones.zone_id = zone.zone_id AND user_zones.user_id = :userId', [':userId' => $user->user_id])
+            ->andWhere(['school.school_id' => $schoolId])
+            ->exists();
+
+        if (!$isAssigned) {
+            return ['error' => 'Access denied to this school'];
+        }
+
+        $offset = ($page - 1) * $perPage;
+
+        // Get students with pagination
+        $students = \app\models\Students::find()
+            ->where(['school_id' => $schoolId])
+            ->orderBy(['surname' => SORT_ASC, 'other_name' => SORT_ASC])
+            ->offset($offset)
+            ->limit($perPage + 1) // Get one extra to check if there are more
+            ->all();
+
+        $hasMore = count($students) > $perPage;
+        if ($hasMore) {
+            array_pop($students); // Remove the extra item
+        }
+
+        $studentData = [];
+        foreach ($students as $student) {
+            $assignment = StudentSupervisorAssignment::findOne(['student_reg_no' => $student->student_reg_no]);
+            $supervisorName = 'Unassigned';
+            $supervisorEmail = null;
+            $supervisorPhone = null;
+            if ($assignment && $assignment->supervisor_user_id) {
+                $supervisor = Users::findOne(['user_id' => $assignment->supervisor_user_id]);
+                if ($supervisor) {
+                    $supervisorName = $supervisor->name ?: 'Unknown';
+                    if ($supervisor->hasAttribute('email')) {
+                        $supervisorEmail = $supervisor->email ?: null;
+                    } elseif (filter_var($supervisor->username, FILTER_VALIDATE_EMAIL)) {
+                        $supervisorEmail = $supervisor->username;
+                    }
+                    $supervisorPhone = $supervisor->phone ?: null;
+                } else {
+                    $supervisorName = 'Unknown';
+                }
+            }
+
+            $studentData[] = [
+                'student_id' => $student->student_id,
+                'student_reg_no' => $student->student_reg_no,
+                'other_name' => $student->other_name,
+                'surname' => $student->surname,
+                'phone_no' => $student->phone_no,
+                'email' => $student->email,
+                'school_id' => $student->school_id,
+                'supervisorName' => $supervisorName,
+                'supervisorEmail' => $supervisorEmail,
+                'supervisorPhone' => $supervisorPhone,
+            ];
+        }
+
+        return [
+            'students' => $studentData,
+            'hasMore' => $hasMore,
+            'page' => $page,
+            'perPage' => $perPage
+        ];
+    }
+
+    /**
+     * Manage zones, schools, and students - dedicated page for zone coordinators
+     */
+    public function actionManageZones()
+    {
+        $user = Yii::$app->user->identity;
+
+        // Get zones assigned to this coordinator via the assignment table
+        $assignedZones = \app\models\Zone::find()
+            ->innerJoin('user_zones', 'user_zones.zone_id = zone.zone_id AND user_zones.user_id = :userId', [':userId' => $user->user_id])
+            ->all();
+
+        // Get all schools in assigned zones for dropdown
+        $schools = [];
+        foreach ($assignedZones as $zone) {
+            $zoneSchools = \app\models\School::find()
+                ->where(['zone_id' => $zone->zone_id])
+                ->orderBy(['school_name' => SORT_ASC])
+                ->all();
+            $schools[$zone->zone_id] = $zoneSchools;
+        }
+
+        return $this->render('manage-zones', [
+            'assignedZones' => $assignedZones,
+            'schools' => $schools,
+        ]);
+    }
+
+    /**
+     * Get students for a specific school with validation status (AJAX)
+     */
+    public function actionGetSchoolStudentsWithStatus()
+    {
+        if (!Yii::$app->user->identity || Yii::$app->user->identity->role_id != 2) {
+            throw new \yii\web\ForbiddenHttpException('Access denied.');
+        }
+
+        Yii::$app->response->format = \yii\web\Response::FORMAT_JSON;
+
+        $schoolId = Yii::$app->request->get('school_id');
+        $page = (int) Yii::$app->request->get('page', 1);
+        $perPage = 20;
+
+        if (!$schoolId) {
+            return ['error' => 'School ID is required'];
+        }
+
+        // Verify school is in a zone assigned to this coordinator
+        $user = Yii::$app->user->identity;
+        $isAssigned = \app\models\School::find()
+            ->innerJoin('zone', 'zone.zone_id = school.zone_id')
+            ->innerJoin('user_zones', 'user_zones.zone_id = zone.zone_id AND user_zones.user_id = :userId', [':userId' => $user->user_id])
+            ->andWhere(['school.school_id' => $schoolId])
+            ->exists();
+
+        if (!$isAssigned) {
+            return ['error' => 'Access denied to this school'];
+        }
+
+        $offset = ($page - 1) * $perPage;
+
+        // Get students with assessment validation status
+        $students = \app\models\Students::find()
+            ->where(['school_id' => $schoolId])
+            ->orderBy(['surname' => SORT_ASC, 'other_name' => SORT_ASC])
+            ->offset($offset)
+            ->limit($perPage + 1)
+            ->all();
+
+        $hasMore = count($students) > $perPage;
+        if ($hasMore) {
+            array_pop($students);
+        }
+
+        $studentData = [];
+        foreach ($students as $student) {
+            // Check if student has any assessments and their validation status
+            $assessments = \app\models\Assessment::find()
+                ->where(['student_reg_no' => $student->student_reg_no])
+                ->orderBy(['assessment_date' => SORT_DESC, 'assessment_id' => SORT_DESC])
+                ->all();
+
+            $hasAssessments = count($assessments) > 0;
+            $validatedCount = 0;
+            $totalAssessments = count($assessments);
+
+            foreach ($assessments as $assessment) {
+                if ($assessment->validated_by) {
+                    $validatedCount++;
+                }
+            }
+
+            $validationStatus = 'Not Validated';
+            if ($totalAssessments > 0) {
+                if ($validatedCount === $totalAssessments) {
+                    $validationStatus = 'Fully Validated';
+                } elseif ($validatedCount > 0) {
+                    $validationStatus = 'Partially Validated';
+                } else {
+                    $validationStatus = 'Not Validated';
+                }
+            }
+
+            $assignment = StudentSupervisorAssignment::findOne(['student_reg_no' => $student->student_reg_no]);
+            $supervisorName = 'Unassigned';
+            $supervisorEmail = null;
+            $supervisorPhone = null;
+            if ($assignment && $assignment->supervisor_user_id) {
+                $supervisor = Users::findOne(['user_id' => $assignment->supervisor_user_id]);
+                if ($supervisor) {
+                    $supervisorName = $supervisor->name ?: 'Unknown';
+                    if ($supervisor->hasAttribute('email')) {
+                        $supervisorEmail = $supervisor->email ?: null;
+                    } elseif (filter_var($supervisor->username, FILTER_VALIDATE_EMAIL)) {
+                        $supervisorEmail = $supervisor->username;
+                    }
+                    $supervisorPhone = $supervisor->phone ?: null;
+                } else {
+                    $supervisorName = 'Unknown';
+                }
+            }
+
+            $assessmentId = null;
+            $assessmentAction = null;
+            if (!empty($assessments)) {
+                // Prefer a submitted assessment that still needs validation
+                foreach ($assessments as $assessment) {
+                    if ($assessment->archived == 1 && !$assessment->validated_by) {
+                        $assessmentId = $assessment->assessment_id;
+                        $assessmentAction = 'validate';
+                        break;
+                    }
+                }
+                if (!$assessmentId) {
+                    $latestAssessment = $assessments[0];
+                    $assessmentId = $latestAssessment->assessment_id;
+                    $assessmentAction = 'review';
+                }
+            }
+
+            $studentData[] = [
+                'student_id' => $student->student_id,
+                'student_reg_no' => $student->student_reg_no,
+                'other_name' => $student->other_name,
+                'surname' => $student->surname,
+                'phone_no' => $student->phone_no,
+                'email' => $student->email,
+                'school_id' => $student->school_id,
+                'hasAssessments' => $hasAssessments,
+                'totalAssessments' => $totalAssessments,
+                'validatedAssessments' => $validatedCount,
+                'validationStatus' => $validationStatus,
+                'supervisorName' => $supervisorName,
+                'supervisorEmail' => $supervisorEmail,
+                'supervisorPhone' => $supervisorPhone,
+                'assessmentId' => $assessmentId,
+                'assessmentAction' => $assessmentAction,
+            ];
+        }
+
+        return [
+            'students' => $studentData,
+            'hasMore' => $hasMore,
+            'page' => $page,
+            'perPage' => $perPage
         ];
     }
 }

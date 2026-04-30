@@ -5,7 +5,6 @@
 
 use yii\bootstrap5\Html;
 use app\components\RbacHelper;
-use app\models\Assessment;
 
 $this->title = 'Dashboard';
 ?>
@@ -122,20 +121,15 @@ $this->title = 'Dashboard';
 
         <!-- SYSTEM OVERVIEW STATISTICS -->
         <div class="dashboard-section">
-            <h3 class="section-title"><i class="fas fa-chart-bar"></i> System Overview</h3>
+            <?php $overviewTitle = $stats['overviewTitle'] ?? 'System Overview'; ?>
+            <h3 class="section-title"><i class="fas fa-chart-bar"></i> <?= Html::encode($overviewTitle) ?></h3>
             <div class="stats-grid">
                 <?php
-                $totalAssessments = Assessment::find()->count();
-                $pendingValidation = Assessment::find()
-                    ->andWhere(['archived' => 1])
-                    ->andWhere(['is', 'validated_by', null])
-                    ->count();
-                $inProgressAssessments = Assessment::find()
-                    ->andWhere(['or', ['archived' => 0], ['archived' => null]])
-                    ->andWhere(['is', 'validated_by', null])
-                    ->count();
-                $validatedAssessments = Assessment::find()->andWhere(['is not', 'validated_by', null])->count();
-                $schoolCount = Assessment::find()->select(['school_id'])->distinct()->count('DISTINCT school_id');
+                $totalAssessments = $stats['totalAssessments'] ?? 0;
+                $pendingValidation = $stats['pendingValidation'] ?? 0;
+                $inProgressAssessments = $stats['inProgressAssessments'] ?? 0;
+                $validatedAssessments = $stats['validatedAssessments'] ?? 0;
+                $schoolCount = $stats['totalSchools'] ?? 0;
                 ?>
                 <div class="stat-item">
                     <div class="stat-value"><?= $totalAssessments ?></div>

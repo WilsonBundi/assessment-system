@@ -23,8 +23,10 @@ $this->params['breadcrumbs'][] = $this->title;
                         <div class="col-md-6">
                             <p><strong>Total Score:</strong> <?= $model->total_score ?? 'N/A' ?></p>
                             <p><strong>Overall Level:</strong> <span class="badge badge-info"><?= $model->overall_level ?? 'N/A' ?></span></p>
-                            <p><strong>Status:</strong> 
-                                <?php if ($model->archived == 1): ?>
+                            <p><strong>Status:</strong>
+                                <?php if ($model->isCompleted): ?>
+                                    <span class="badge badge-success">Completed</span>
+                                <?php elseif ($model->archived == 1): ?>
                                     <span class="badge badge-success">Submitted</span>
                                 <?php else: ?>
                                     <span class="badge badge-warning">In Progress</span>

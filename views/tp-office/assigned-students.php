@@ -40,6 +40,8 @@ $this->params['breadcrumbs'][] = $this->title;
                                             <tr>
                                                 <th>Student ID</th>
                                                 <th>Student Name</th>
+                                                <th>Phone</th>
+                                                <th>Email</th>
                                                 <th>Supervisor</th>
                                                 <th>Assigned Date</th>
                                             </tr>
@@ -56,6 +58,12 @@ $this->params['breadcrumbs'][] = $this->title;
                                                     </td>
                                                     <td>
                                                         <?= Html::encode($student->name) ?>
+                                                    </td>
+                                                    <td>
+                                                        <?= Html::encode($student->phone_no ?: 'N/A') ?>
+                                                    </td>
+                                                    <td>
+                                                        <?= Html::encode($student->email ?: 'N/A') ?>
                                                     </td>
                                                     <td>
                                                         <?= Html::encode($assignment->supervisor->name) ?>

@@ -192,46 +192,30 @@ $this->registerJs("
                         <h5 class="mb-0"><i class="fas fa-chart-bar"></i> Assessment Statistics</h5>
                     </div>
                     <div class="card-body">
-                        <div class="row text-center mb-3">
-                            <div class="col-md-6 mb-3">
-                                <div class="stat-box">
-                                    <h3 class="text-primary mb-0"><?= $totalAssessments ?></h3>
-                                    <p class="text-muted mb-0">Total Assessments</p>
-                                </div>
+                        <div class="stats-grid">
+                            <div class="stat-item">
+                                <div class="stat-value text-primary"><?= $totalAssessments ?></div>
+                                <div class="stat-label">Total Assessments</div>
                             </div>
-                            <div class="col-md-6 mb-3">
-                                <div class="stat-box">
-                                    <h3 class="text-success mb-0"><?= $completedAssessments ?></h3>
-                                    <p class="text-muted mb-0">Completed</p>
-                                </div>
+                            <div class="stat-item">
+                                <div class="stat-value text-success"><?= $completedAssessments ?></div>
+                                <div class="stat-label">Completed</div>
                             </div>
-                        </div>
-                        <div class="row text-center">
-                            <div class="col-md-6 mb-3">
-                                <div class="stat-box">
-                                    <h3 class="text-warning mb-0"><?= $pendingAssessments ?></h3>
-                                    <p class="text-muted mb-0">Pending</p>
-                                </div>
+                            <div class="stat-item">
+                                <div class="stat-value text-warning"><?= $pendingAssessments ?></div>
+                                <div class="stat-label">Pending</div>
                             </div>
-                            <div class="col-md-6 mb-3">
-                                <div class="stat-box">
-                                    <h3 class="text-info mb-0"><?= $uniqueStudents ?></h3>
-                                    <p class="text-muted mb-0">Students Assessed</p>
-                                </div>
+                            <div class="stat-item">
+                                <div class="stat-value text-info"><?= $uniqueStudents ?></div>
+                                <div class="stat-label">Students Assessed</div>
                             </div>
-                        </div>
-                        <div class="row text-center">
-                            <div class="col-md-6 mb-3">
-                                <div class="stat-box">
-                                    <h3 class="text-secondary mb-0"><?= $totalGrades ?></h3>
-                                    <p class="text-muted mb-0">Grades Recorded</p>
-                                </div>
+                            <div class="stat-item">
+                                <div class="stat-value text-secondary"><?= $totalGrades ?></div>
+                                <div class="stat-label">Grades Recorded</div>
                             </div>
-                            <div class="col-md-6 mb-3">
-                                <div class="stat-box">
-                                    <h3 class="text-primary mb-0"><?= $learningAreas ?></h3>
-                                    <p class="text-muted mb-0">Learning Areas</p>
-                                </div>
+                            <div class="stat-item">
+                                <div class="stat-value text-primary"><?= $learningAreas ?></div>
+                                <div class="stat-label">Learning Areas</div>
                             </div>
                         </div>
                     </div>
@@ -330,6 +314,8 @@ $this->registerJs("
                                         <tr>
                                             <th class="fw-bold">Student Registration Number</th>
                                             <th class="fw-bold">Student Name</th>
+                                            <th class="fw-bold">Phone</th>
+                                            <th class="fw-bold">Email</th>
                                             <th class="fw-bold">Zone</th>
                                             <th class="fw-bold">School</th>
                                             <th class="fw-bold">Action</th>
@@ -347,6 +333,8 @@ $this->registerJs("
                                             $row = '<tr>';
                                             $row .= '<td><strong>' . Html::encode($student->student_reg_no) . '</strong></td>';
                                             $row .= '<td>' . Html::encode($student->name) . '</td>';
+                                            $row .= '<td>' . Html::encode($student->phone_no ?: 'N/A') . '</td>';
+                                            $row .= '<td>' . Html::encode($student->email ?: 'N/A') . '</td>';
                                             $row .= '<td><span class="badge bg-secondary">' . Html::encode($student->zone ? $student->zone->zone_name : 'N/A') . '</span></td>';
                                             $row .= '<td>' . ($student->school ? Html::encode($student->school->school_name) : 'N/A') . '</td>';
                                             $row .= '<td>';
@@ -439,6 +427,7 @@ $this->registerJs("
                                             <th>Student Reg No</th>
                                             <th>School</th>
                                             <th>Assessment Date</th>
+                                            <th>Status</th>
                                             <th>Overall Level</th>
                                             <th>Actions</th>
                                         </tr>
@@ -449,6 +438,11 @@ $this->registerJs("
                                                 <td><?= Html::encode($assessment->student_reg_no) ?></td>
                                                 <td><?= Html::encode($assessment->school->school_name ?? 'N/A') ?></td>
                                                 <td><?= date('M d, Y', strtotime($assessment->assessment_date)) ?></td>
+                                                <td>
+                                                    <span class="badge <?= $assessment->isCompleted ? 'badge-success' : ($assessment->isSubmitted ? 'badge-warning' : 'badge-secondary') ?>">
+                                                        <?= Html::encode($assessment->statusLabel) ?>
+                                                    </span>
+                                                </td>
                                                 <td>
                                                     <?php 
                                                     $level = $assessment->overall_level;
@@ -466,8 +460,17 @@ $this->registerJs("
                                                     <?= Html::a(
                                                         '<i class="fas fa-eye"></i> View',
                                                         ['/assessment/view', 'assessment_id' => $assessment->assessment_id],
-                                                        ['class' => 'btn btn-sm btn-info']
+                                                        ['class' => 'btn btn-sm btn-info me-1']
                                                     ) ?>
+                                                    <?php if (!$assessment->isCompleted): ?>
+                                                        <?= Html::a(
+                                                            '<i class="fas fa-edit"></i> Edit',
+                                                            ['/assessment/update', 'assessment_id' => $assessment->assessment_id],
+                                                            ['class' => 'btn btn-sm btn-primary']
+                                                        ) ?>
+                                                    <?php else: ?>
+                                                        <span class="badge bg-success">Completed</span>
+                                                    <?php endif; ?>
                                                 </td>
                                             </tr>
                                         <?php endforeach; ?>
@@ -533,5 +536,34 @@ $this->registerJs("
 
     .table-hover tbody tr:hover {
         background-color: #f5f5f5;
+    }
+
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 1rem;
+    }
+
+    .stat-item {
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        border-radius: 0.75rem;
+        padding: 1.25rem;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+        text-align: center;
+        border-left: 4px solid #28a745;
+    }
+
+    .stat-value {
+        font-size: 2.25rem;
+        font-weight: 800;
+        margin-bottom: 0.5rem;
+    }
+
+    .stat-label {
+        color: #6c757d;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        font-size: 0.85rem;
     }
 </style>

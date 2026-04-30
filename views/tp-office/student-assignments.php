@@ -98,8 +98,8 @@ foreach ($dataByZone as $zoneData) {
                                     <div class="col-md-5">
                                         <label class="form-label fw-bold mb-2">Select Zone</label>
                                         <?= Html::dropDownList('zone_id', $selectedZoneId, ArrayHelper::map($zones, 'zone_id', 'zone_name'), [
-                                            'class' => 'form-select',
-                                            'prompt' => 'All Zones',
+                                            'class' => 'form-select searchable-select',
+                                            'data-placeholder' => 'All Zones',
                                             'onchange' => 'this.form.submit()'
                                         ]) ?>
                                     </div>
@@ -172,18 +172,20 @@ foreach ($dataByZone as $zoneData) {
                                                 }
                                                 ?>
                                                 <?= Html::dropDownList('supervisor_user_id', null, $supervisorOptions, [
-                                                    'class' => 'form-select',
-                                                    'prompt' => '-- Choose supervisor --',
+                                                    'class' => 'form-select searchable-select',
+                                                    'data-placeholder' => '-- Choose supervisor --',
                                                     'required' => true
                                                 ]) ?>
                                             </div>
                                             <div class="col-md-5">
                                                 <label class="form-label fw-bold mb-2">Select Student</label>
                                                 <?= Html::dropDownList('student_reg_no', null, ArrayHelper::map($zoneData['unassignedStudents'], 'student_reg_no', function($student) {
-                                                    return $student->name . ' - ' . $student->student_reg_no . ' (' . ($student->school ? $student->school->school_name : 'Unknown School') . ')';
+                                                    $phone = $student->phone_no ? ' | ' . $student->phone_no : '';
+                                                    $email = $student->email ? ' | ' . $student->email : '';
+                                                    return $student->name . ' - ' . $student->student_reg_no . ' (' . ($student->school ? $student->school->school_name : 'Unknown School') . ')' . $phone . $email;
                                                 }), [
-                                                    'class' => 'form-select',
-                                                    'prompt' => '-- Choose student --',
+                                                    'class' => 'form-select searchable-select',
+                                                    'data-placeholder' => '-- Choose student --',
                                                     'required' => true
                                                 ]) ?>
                                             </div>
@@ -339,8 +341,8 @@ foreach ($dataByZone as $zoneData) {
                 <div class="modal-body">
                     <label class="form-label fw-bold mb-2">Select New Supervisor</label>
                     <?= Html::dropDownList('supervisor_user_id', null, [], [
-                        'class' => 'form-select form-select-lg',
-                        'prompt' => '-- Choose a supervisor --',
+                        'class' => 'form-select form-select-lg searchable-select',
+                        'data-placeholder' => '-- Choose a supervisor --',
                         'id' => 'reassign-supervisor-select',
                         'required' => true
                     ]) ?>
@@ -616,7 +618,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 zoneData.unassignedStudents.forEach(function(student) {
                     const option = document.createElement('option');
                     option.value = student.student_reg_no;
-                    option.textContent = student.name + ' - ' + student.student_reg_no + ' (' + student.school_name + ')';
+                    const phone = student.phone_no ? ' | ' + student.phone_no : '';
+                    const email = student.email ? ' | ' + student.email : '';
+                    option.textContent = student.name + ' - ' + student.student_reg_no + ' (' + student.school_name + ')' + phone + email;
                     studentSelect.appendChild(option);
                 });
             }

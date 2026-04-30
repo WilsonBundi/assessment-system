@@ -10,14 +10,21 @@ use yii\bootstrap5\Breadcrumbs;
 use yii\bootstrap5\Html;
 use yii\bootstrap5\Nav;
 use yii\bootstrap5\NavBar;
+use yii\helpers\Url;
 
 
 AppAsset::register($this);
 // Add Font Awesome for action icons
 $this->registerCssFile('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css', [
-    'integrity' => 'sha512-dyZtM4Q+6QJ6QnQ+6QJ6QnQ+6QJ6QnQ+6QJ6QnQ+6QJ6QnQ+6QJ6QnQ+6QJ6QnQ+6QJ6QnQ+6QJ6QnQ+6QJ6QnQ==',
+    'integrity' => 'sha512-1ycn6IcaQQ40/MKBW2W4Rhis/DbILU74C1vSrLJxCq57o941Ym01SwNsOMqvEBFlcgUa6xLiPY/NS5R+E6ztJQ==',
     'crossorigin' => 'anonymous',
     'referrerpolicy' => 'no-referrer',
+]);
+
+// Add Select2 for searchable dropdowns
+$this->registerCssFile('https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css');
+$this->registerJsFile('https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js', [
+    'depends' => [\yii\web\JqueryAsset::class]
 ]);
 
 $this->registerCsrfMetaTags();
@@ -82,29 +89,41 @@ $this->registerCss('
 
 <header id="header">
     <?php
+    $dashboardRoute = ['/site/dashboard'];
+    $userRoleId = !Yii::$app->user->isGuest ? Yii::$app->user->identity->role_id : null;
+    if ($userRoleId == 1) {
+        $dashboardRoute = ['/supervisor/profile'];
+    } elseif ($userRoleId == 2) {
+        $dashboardRoute = ['/zone-coordinator/profile'];
+    } elseif ($userRoleId == 3) {
+        $dashboardRoute = ['/tp-office/index'];
+    } elseif ($userRoleId == 4) {
+        $dashboardRoute = ['/department-chair/profile'];
+    }
+
     NavBar::begin([
         'brandLabel' => Yii::$app->name,
-        'brandUrl' => Yii::$app->homeUrl,
+        'brandUrl' => Yii::$app->user->isGuest ? Yii::$app->homeUrl : Url::to($dashboardRoute),
         'options' => ['class' => 'navbar-expand-md navbar-dark fixed-top', 'style' => 'background: linear-gradient(90deg, #5B9BD5 0%, #2E75B6 100%) !important;']
     ]);
     $navItems = [];
     
     if (!Yii::$app->user->isGuest) {
         // Supervisor Menu (role_id = 1)
-        if (Yii::$app->user->identity->role_id == 1) {
+        if ($userRoleId == 1) {
             $navItems[] = ['label' => 'Dashboard', 'url' => ['/supervisor/profile']];
             $navItems[] = ['label' => 'Create Assessment', 'url' => ['/assessment/create']];
             $navItems[] = ['label' => 'My Assessments', 'url' => ['/assessment/index']];
         }
 
         // Zone Coordinator Menu (role_id = 2)
-        if (Yii::$app->user->identity->role_id == 2) {
+        if ($userRoleId == 2) {
             $navItems[] = ['label' => 'Dashboard', 'url' => ['/zone-coordinator/profile']];
             $navItems[] = ['label' => 'Assessments', 'url' => ['/assessment/index']];
         }
         
         // TP Office Menu (role_id = 3)
-        if (Yii::$app->user->identity->role_id == 3) {
+        if ($userRoleId == 3) {
             $navItems[] = ['label' => 'Dashboard', 'url' => ['/tp-office/index']];
             $navItems[] = ['label' => 'Reports', 'url' => ['/tp-office/reports']];
             $navItems[] = [
@@ -122,7 +141,7 @@ $this->registerCss('
         }
 
         // Department Chair Menu (role_id = 4)
-        if (Yii::$app->user->identity->role_id == 4) {
+        if ($userRoleId == 4) {
             $navItems[] = ['label' => 'Dashboard', 'url' => ['/department-chair/profile']];
             $navItems[] = ['label' => 'System Reports', 'url' => ['/department-chair/system-reports']];
         }
@@ -171,6 +190,20 @@ $this->registerCss('
 if (!Yii::$app->user->isGuest) {
     echo $this->render('@app/views/layouts/chat-widget');
 }
+
+// Initialize Select2 for searchable dropdowns
+$this->registerJs("
+    $(document).ready(function() {
+        // Initialize Select2 on all dropdowns with class 'searchable-select'
+        $('.searchable-select').select2({
+            placeholder: function() {
+                return $(this).data('placeholder') || 'Search and select...';
+            },
+            allowClear: true,
+            width: '100%'
+        });
+    });
+");
 ?>
 
 <?php $this->endBody() ?>

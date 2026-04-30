@@ -157,6 +157,10 @@ class AssessmentController extends Controller
 
         $model = $this->findModel($assessmentId);
 
+        if (RbacHelper::isSupervisor() && $model->validated_by !== null) {
+            throw new ForbiddenHttpException('This assessment has already been validated and cannot be modified.');
+        }
+
         // ACL: supervisors can only work on own/in-progress assessments; others must be mapped indirectly
         if (RbacHelper::isSupervisor() && $model->examiner_user_id !== null && $model->examiner_user_id !== Yii::$app->user->id && $model->archived == Assessment::STATUS_SUBMITTED) {
             throw new ForbiddenHttpException('You do not have permission to upload images for this assessment.');
@@ -265,6 +269,15 @@ class AssessmentController extends Controller
             // Pre-fill form fields from supervisor profile
             if ($student_reg_no) {
                 $model->student_reg_no = $student_reg_no;
+                $student = \app\models\Students::findOne(['student_reg_no' => $student_reg_no]);
+                if ($student) {
+                    if (!$model->school_id && $student->school_id) {
+                        $model->school_id = $student->school_id;
+                    }
+                    if ($student->class_id) {
+                        $model->class_id = $student->class_id;
+                    }
+                }
             }
             if ($examiner_user_id) {
                 $model->examiner_user_id = $examiner_user_id;
@@ -304,6 +317,11 @@ class AssessmentController extends Controller
         }
 
         $model = $this->findModel($assessmentId);
+
+        if (RbacHelper::isSupervisor() && $model->validated_by !== null) {
+            Yii::$app->session->setFlash('info', 'Assessment completed. Editing is not allowed.');
+            return $this->redirect(['view', 'assessment_id' => $model->assessment_id]);
+        }
         
         // Store in session for navigation tracking
         Yii::$app->session['active_assessment_id'] = $model->assessment_id;
@@ -470,6 +488,10 @@ class AssessmentController extends Controller
         }
 
         $model = $this->findModel($assessment_id);
+
+        if (RbacHelper::isSupervisor() && $model->validated_by !== null) {
+            throw new ForbiddenHttpException('This assessment has already been validated and cannot be modified.');
+        }
         
         \app\components\AssessmentImageBehavior::deleteImage($assessment_id, $filename);
         
@@ -493,6 +515,11 @@ class AssessmentController extends Controller
         }
 
         $model = $this->findModel($assessmentId);
+
+        if (RbacHelper::isSupervisor() && $model->validated_by !== null) {
+            Yii::$app->session->setFlash('info', 'Assessment completed. Editing is not allowed.');
+            return $this->redirect(['view', 'assessment_id' => $model->assessment_id]);
+        }
         
         // Store in session for navigation tracking
         Yii::$app->session['active_assessment_id'] = $model->assessment_id;
@@ -627,6 +654,80 @@ class AssessmentController extends Controller
     }
 
     /**
+     * Get classes for a specific school (AJAX)
+     * @param int $school_id School ID
+     * @return array JSON array of classes
+     */
+    public function actionGetClasses($school_id)
+    {
+        Yii::$app->response->format = \yii\web\Response::FORMAT_JSON;
+
+        if (!$school_id) {
+            return ['classes' => []];
+        }
+
+        $classes = \app\models\SchoolClass::find()
+            ->where(['school_id' => $school_id])
+            ->orderBy(['class_name' => SORT_ASC])
+            ->all();
+
+        $result = [];
+        foreach ($classes as $class) {
+            $result[$class->class_id] = $class->class_name;
+        }
+
+        return ['classes' => $result];
+    }
+
+    /**
+     * Get student details for a specific student registration number (AJAX)
+     * @param string $student_reg_no Student registration number
+     * @return array JSON student details and class options
+     */
+    public function actionGetStudentDetails($student_reg_no)
+    {
+        Yii::$app->response->format = \yii\web\Response::FORMAT_JSON;
+
+        if (!$student_reg_no) {
+            return ['student' => null, 'classes' => []];
+        }
+
+        $student = \app\models\Students::findOne(['student_reg_no' => $student_reg_no]);
+        if (!$student) {
+            return ['student' => null, 'classes' => []];
+        }
+
+        $schoolId = $student->school_id;
+        $classId = $student->class_id;
+
+        if (!$schoolId && $classId) {
+            $class = \app\models\SchoolClass::findOne($classId);
+            if ($class) {
+                $schoolId = $class->school_id;
+            }
+        }
+
+        $classes = [];
+        if ($schoolId) {
+            $classRecords = \app\models\SchoolClass::find()
+                ->where(['school_id' => $schoolId])
+                ->orderBy(['class_name' => SORT_ASC])
+                ->all();
+            foreach ($classRecords as $classRecord) {
+                $classes[$classRecord->class_id] = $classRecord->class_name;
+            }
+        }
+
+        return [
+            'student' => [
+                'school_id' => $schoolId,
+                'class_id' => $classId,
+            ],
+            'classes' => $classes,
+        ];
+    }
+
+    /**
      * Get strands for a specific learning area (AJAX)
      * @param int $learning_area_id Learning Area ID
      * @return array JSON array of strands
@@ -653,9 +754,9 @@ class AssessmentController extends Controller
     }
 
     /**
-     * Get substrands for a specific strand (AJAX)
-     * @param int $strand_id Strand ID
-     * @return array JSON array of substrands
+     * Get strands for a specific learning area (AJAX)
+     * @param int $learning_area_id Learning Area ID
+     * @return array JSON array of strands
      */
     public function actionGetSubstrands($strand_id)
     {

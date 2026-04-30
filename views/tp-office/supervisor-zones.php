@@ -95,8 +95,8 @@ $zoneOptions = ArrayHelper::map($zones, 'zone_id', 'zone_name');
                                                     <?= Html::hiddenInput(Yii::$app->request->csrfParam, Yii::$app->request->csrfToken) ?>
                                                     <?= Html::hiddenInput('supervisor_user_id', $supervisor->user_id) ?>
                                                     <?= Html::dropDownList('zone_id', $supervisor->zone_id, $zoneOptions, [
-                                                        'class' => 'form-select form-select-sm',
-                                                        'prompt' => '-- Choose a zone --',
+                                                        'class' => 'form-select form-select-sm searchable-select',
+                                                        'data-placeholder' => '-- Choose a zone --',
                                                         'required' => true,
                                                     ]) ?>
                                             </td>

@@ -55,6 +55,9 @@ $config = [
                 'assessment/audit-log/<id:\d+>' => 'assessment/audit-log',
                 'assessment/update/<id:\d+>' => 'assessment/update',
                 'assessment/delete/<id:\d+>' => 'assessment/delete',
+
+                // TP Office catch-all for all actions
+                'tp-office/<action:[\w-]+>' => 'tp-office/<action>',
             ],
         ],
         

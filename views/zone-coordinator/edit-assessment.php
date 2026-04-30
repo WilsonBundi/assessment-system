@@ -33,42 +33,50 @@ $this->params['breadcrumbs'][] = $this->title;
 
             <hr>
 
-            <div class="alert alert-warning">
-                <strong>Editable Fields:</strong> You can modify basic assessment information for accuracy and completeness.
-            </div>
-
-            <?php $form = \yii\widgets\ActiveForm::begin(); ?>
-
-            <div class="row">
-                <div class="col-md-6">
-                    <?= $form->field($model, 'student_reg_no') ?>
+            <?php if ($model->isCompleted): ?>
+                <div class="alert alert-success">
+                    <h4 class="alert-heading">ASSESSMENT COMPLETED</h4>
+                    <p>This assessment has already been validated and cannot be edited.</p>
                 </div>
-                <div class="col-md-6">
-                    <?= $form->field($model, 'assessment_date') ?>
+                <?= Html::a('Back to Review', ['review-assessment', 'assessment_id' => $model->assessment_id], ['class' => 'btn btn-secondary']) ?>
+            <?php else: ?>
+                <div class="alert alert-warning">
+                    <strong>Editable Fields:</strong> You can modify basic assessment information for accuracy and completeness.
                 </div>
-            </div>
 
-            <div class="row">
-                <div class="col-md-6">
-                    <?= $form->field($model, 'learning_area_id')->dropDownList(
-                        \yii\helpers\ArrayHelper::map(\app\models\LearningArea::find()->all(), 'learning_area_id', 'learning_area_name'),
-                        ['prompt' => 'Select Learning Area...']
-                    ) ?>
+                <?php $form = \yii\widgets\ActiveForm::begin(); ?>
+
+                <div class="row">
+                    <div class="col-md-6">
+                        <?= $form->field($model, 'student_reg_no') ?>
+                    </div>
+                    <div class="col-md-6">
+                        <?= $form->field($model, 'assessment_date') ?>
+                    </div>
                 </div>
-                <div class="col-md-6">
-                    <?= $form->field($model, 'school_id')->dropDownList(
-                        \yii\helpers\ArrayHelper::map(\app\models\School::find()->all(), 'school_id', 'school_name'),
-                        ['prompt' => 'Select School...']
-                    ) ?>
+
+                <div class="row">
+                    <div class="col-md-6">
+                        <?= $form->field($model, 'learning_area_id')->dropDownList(
+                            \yii\helpers\ArrayHelper::map(\app\models\LearningArea::find()->all(), 'learning_area_id', 'learning_area_name'),
+                            ['prompt' => 'Select Learning Area...', 'class' => 'form-select']
+                        ) ?>
+                    </div>
+                    <div class="col-md-6">
+                        <?= $form->field($model, 'school_id')->dropDownList(
+                            \yii\helpers\ArrayHelper::map(\app\models\School::find()->all(), 'school_id', 'school_name'),
+                            ['prompt' => 'Select School...', 'class' => 'form-control searchable-select', 'data-placeholder' => 'Select School...']
+                        ) ?>
+                    </div>
                 </div>
-            </div>
 
-            <div class="form-group">
-                <?= Html::submitButton('Save Changes', ['class' => 'btn btn-success']) ?>
-                <?= Html::a('Cancel', ['review-assessment', 'assessment_id' => $model->assessment_id], ['class' => 'btn btn-secondary']) ?>
-            </div>
+                <div class="form-group">
+                    <?= Html::submitButton('Save Changes', ['class' => 'btn btn-success']) ?>
+                    <?= Html::a('Cancel', ['review-assessment', 'assessment_id' => $model->assessment_id], ['class' => 'btn btn-secondary']) ?>
+                </div>
 
-            <?php \yii\widgets\ActiveForm::end(); ?>
+                <?php \yii\widgets\ActiveForm::end(); ?>
+            <?php endif; ?>
         </div>
     </div>
 </div>

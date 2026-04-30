@@ -20,7 +20,7 @@ use app\models\Zone;
 
     <?= $form->field($model, 'zone_id')->dropDownList(
         ArrayHelper::map(Zone::find()->orderBy(['zone_name' => SORT_ASC])->all(), 'zone_id', 'zone_name'),
-        ['prompt' => 'Select Zone...', 'class' => 'form-control']
+        ['prompt' => 'Select Zone...', 'class' => 'form-control searchable-select', 'data-placeholder' => 'Select Zone...']
     ) ?>
 
     <div class="btn-group">

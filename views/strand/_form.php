@@ -16,7 +16,7 @@ use app\models\LearningArea;
 
     <?= $form->field($model, 'learning_area_id')->dropDownList(
         ArrayHelper::map(LearningArea::find()->all(), 'learning_area_id', 'learning_area_name'),
-        ['prompt' => 'Select Learning Area...', 'class' => 'form-control']
+        ['prompt' => 'Select Learning Area...', 'class' => 'form-control searchable-select', 'data-placeholder' => 'Select Learning Area...']
     ) ?>
 
     <?= $form->field($model, 'name')->textInput(['maxlength' => true, 'placeholder' => 'Strand name']) ?>

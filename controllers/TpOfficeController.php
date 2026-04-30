@@ -19,8 +19,164 @@ use app\components\NotificationService;
  * View reports, download reports, archive records, manage master data
  */
 
+
 class TpOfficeController extends Controller
 {
+
+    /**
+     * Display and assign zone coordinators to zones
+     */
+    public function actionZoneCoordinatorAssign()
+    {
+        if (!Yii::$app->user->identity || Yii::$app->user->identity->role_id != 3) {
+            throw new \yii\web\ForbiddenHttpException('Access denied.');
+        }
+
+        // Filtering parameters
+        $zoneId = Yii::$app->request->get('zone_id');
+        $search = Yii::$app->request->get('search', '');
+
+        // Get zones filtered by zone filter
+        $zonesQuery = Zone::find();
+        if (!empty($zoneId)) {
+            $zonesQuery->andWhere(['zone_id' => $zoneId]);
+        }
+        $zones = $zonesQuery->orderBy(['zone_name' => SORT_ASC])->all();
+
+        // Get all coordinators for display of current assignments
+        $allCoordinators = Users::find()->where(['role_id' => 2])->orderBy(['name' => SORT_ASC])->all();
+
+        // Filtering for dropdown - always show all coordinators, filtered only by search
+        $coordinatorQuery = Users::find()->where(['role_id' => 2]);
+        if (!empty($search)) {
+            $coordinatorQuery->andWhere(['like', 'name', strtolower($search)]);
+        }
+        $zoneCoordinators = $coordinatorQuery->orderBy(['name' => SORT_ASC])->all();
+
+        return $this->render('zone-coordinator-assign', [
+            'zones' => $zones,
+            'allCoordinators' => $allCoordinators,
+            'zoneCoordinators' => $zoneCoordinators,
+        ]);
+    }
+
+    /**
+     * Update zone coordinator assignment
+     */
+    public function actionUpdateZoneCoordinator()
+    {
+        if (!Yii::$app->user->identity || Yii::$app->user->identity->role_id != 3) {
+            throw new \yii\web\ForbiddenHttpException('Access denied.');
+        }
+
+        if (Yii::$app->request->isPost) {
+            $zoneId = Yii::$app->request->post('zone_id');
+            $coordinatorId = Yii::$app->request->post('coordinator_user_id');
+
+            if (empty($zoneId)) {
+                Yii::$app->session->setFlash('error', 'Zone must be selected.');
+                return $this->redirect(['zone-coordinator-assign']);
+            }
+
+            if (!empty($coordinatorId)) {
+                $coordinator = Users::findOne(['user_id' => $coordinatorId, 'role_id' => 2]);
+                if (!$coordinator) {
+                    Yii::$app->session->setFlash('error', 'Zone coordinator not found.');
+                    return $this->redirect(['zone-coordinator-assign']);
+                }
+
+                // Check if already assigned to this zone
+                $existingAssignment = \app\models\UserZones::findOne(['user_id' => $coordinatorId, 'zone_id' => $zoneId]);
+                if ($existingAssignment) {
+                    Yii::$app->session->setFlash('info', 'Coordinator is already assigned to this zone.');
+                } else {
+                    // Assign coordinator to zone
+                    $assignment = new \app\models\UserZones();
+                    $assignment->user_id = $coordinatorId;
+                    $assignment->zone_id = $zoneId;
+                    if ($assignment->save()) {
+                        Yii::$app->session->setFlash('success', 'Zone coordinator assigned successfully.');
+                    } else {
+                        $errors = implode(', ', $assignment->getFirstErrors());
+                        Yii::$app->session->setFlash('error', 'Unable to assign zone coordinator: ' . $errors);
+                    }
+                }
+            } else {
+                // Unassign all coordinators from this zone
+                $assignments = \app\models\UserZones::find()->where(['zone_id' => $zoneId])->all();
+                $count = 0;
+                foreach ($assignments as $assignment) {
+                    if ($assignment->delete()) {
+                        $count++;
+                    }
+                }
+                if ($count > 0) {
+                    Yii::$app->session->setFlash('success', $count . ' coordinator(s) unassigned from zone successfully.');
+                } else {
+                    Yii::$app->session->setFlash('info', 'No coordinators were assigned to this zone.');
+                }
+            }
+        }
+
+        return $this->redirect(['zone-coordinator-assign']);
+    }
+
+    /**
+     * Remove a coordinator from a specific zone
+     */
+    public function actionRemoveZoneCoordinator()
+    {
+        if (!Yii::$app->user->identity || Yii::$app->user->identity->role_id != 3) {
+            throw new \yii\web\ForbiddenHttpException('Access denied.');
+        }
+
+        if (Yii::$app->request->isPost) {
+            $userId = Yii::$app->request->post('user_id');
+            $zoneId = Yii::$app->request->post('zone_id');
+
+            if (empty($userId) || empty($zoneId)) {
+                Yii::$app->session->setFlash('error', 'User and zone must both be specified.');
+                return $this->redirect(['zone-coordinator-assign']);
+            }
+
+            $assignment = \app\models\UserZones::findOne(['user_id' => $userId, 'zone_id' => $zoneId]);
+            if ($assignment && $assignment->delete()) {
+                Yii::$app->session->setFlash('success', 'Coordinator removed from zone successfully.');
+            } else {
+                Yii::$app->session->setFlash('error', 'Unable to remove coordinator from zone.');
+            }
+        }
+
+        return $this->redirect(['zone-coordinator-assign']);
+    }
+
+    /**
+     * Clear all coordinators from a specific zone
+     */
+    public function actionClearZoneCoordinators()
+    {
+        if (!Yii::$app->user->identity || Yii::$app->user->identity->role_id != 3) {
+            throw new \yii\web\ForbiddenHttpException('Access denied.');
+        }
+
+        if (Yii::$app->request->isPost) {
+            $zoneId = Yii::$app->request->post('zone_id');
+
+            if (empty($zoneId)) {
+                Yii::$app->session->setFlash('error', 'Zone must be specified.');
+                return $this->redirect(['zone-coordinator-assign']);
+            }
+
+            $count = \app\models\UserZones::deleteAll(['zone_id' => $zoneId]);
+            if ($count > 0) {
+                Yii::$app->session->setFlash('success', $count . ' coordinator(s) removed from zone successfully.');
+            } else {
+                Yii::$app->session->setFlash('info', 'No coordinators were assigned to this zone.');
+            }
+        }
+
+        return $this->redirect(['zone-coordinator-assign']);
+    }
 
     /**
      * Redirects to Substrands management for TP Office
@@ -495,7 +651,6 @@ class TpOfficeController extends Controller
                 'or',
                 ['ilike', 'name', '%' . $searchQuery . '%'],
                 ['ilike', 'username', '%' . $searchQuery . '%'],
-                ['ilike', 'email', '%' . $searchQuery . '%'],
                 ['ilike', 'payroll_no', '%' . $searchQuery . '%']
             ]);
         }
@@ -976,6 +1131,7 @@ class TpOfficeController extends Controller
             'schools' => \app\models\School::find()->count(),
             'zones' => \app\models\Zone::find()->count(),
             'grades' => \app\models\Grade::find()->count(),
+            'classes' => \app\models\SchoolClass::find()->count(),
             'learningAreas' => \app\models\LearningArea::find()->count(),
             'strands' => \app\models\Strand::find()->count(),
             'substrands' => \app\models\Substrand::find()->count(),

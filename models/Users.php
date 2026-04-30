@@ -108,6 +108,16 @@ class Users extends \yii\db\ActiveRecord implements \yii\web\IdentityInterface
     }
 
     /**
+     * Gets query for [[Zones]] - many-to-many relationship.
+     *
+     * @return \yii\db\ActiveQuery
+     */
+    public function getZones()
+    {
+        return $this->hasMany(Zone::class, ['zone_id' => 'zone_id'])->viaTable('user_zones', ['user_id' => 'user_id']);
+    }
+
+    /**
      * Gets query for [[School]].
      *
      * @return \yii\db\ActiveQuery
